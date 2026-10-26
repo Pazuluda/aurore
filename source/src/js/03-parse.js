@@ -396,7 +396,7 @@ function stripEmpty(o) { const r = {}; for (const k in o) if (o[k] !== "" && o[k
 
 /* ---- déduire depuis le chemin quand les tags manquent ---- */
 const DISC_DIR = /^(cd|dis[ck]|disque)\s*[-_ ]?\s*(\d{1,2})$/i;
-const GENERIC_DIR = /^(divers|misc|miscellaneous|various|unsorted|autres?|others?|singles?|titres|tracks|songs|chansons|mp3s?|flac|music|musique|ma musique|my music|downloads?|t[ée]l[ée]chargements?|new folder|nouveau dossier|audio|sons?|playlist|import[ée]?s?)$/i;
+const GENERIC_DIR = /^(divers|misc|miscellaneous|various|unsorted|autres?|others?|singles?|titres|tracks|songs|chansons|mp3s?|flac|music|musique|ma musique|my music|downloads?|t[ée]l[ée]chargements?|new folder|nouveau dossier|audio|sons?|playlist|import[ée]?s?|aurore|ajouts)$/i;
 function inferFromPath(path) {
   const parts = path.split("/").filter(Boolean);
   const file = parts.pop() || "";

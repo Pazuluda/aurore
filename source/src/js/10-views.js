@@ -1,12 +1,8 @@
 /* ===================== vues ===================== */
-function updateBanner() {
-  if (!UI.update) return "";
-  return html`<div class="banner install">${icon("save")}<p><b>Nouvelle version d'aurore : ${UI.update.version}.</b> Télécharge-la et installe-la par-dessus : ta musique, tes playlists et tes stats sont conservées.</p><a class="btn primary sm" href="${UI.update.url}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`;
-}
 function missingBanner() {
-  if (!L.tracks.size || L.importing) return updateBanner();
-  const miss = missingCount(); if (!miss) return updateBanner();
-  if (NATIVE_WIN) return html`${updateBanner()}<div class="banner">${icon("folder")}<p><b>${miss} ${miss > 1 ? "titres ne sont plus dans tes dossiers" : "titre n'est plus dans tes dossiers"}.</b> Ils ont peut-être été déplacés ou supprimés.</p><button class="btn sm" data-act="reopen">${icon("refresh", "sm")} Relire mes dossiers</button><button class="btn sm ghost" data-act="drop-missing">Les retirer de la bibliothèque</button></div>`;
+  if (!L.tracks.size || L.importing) return "";
+  const miss = missingCount(); if (!miss) return "";
+  if (NATIVE_WIN) return html`<div class="banner">${icon("folder")}<p><b>${miss} ${miss > 1 ? "titres ne sont plus dans tes dossiers" : "titre n'est plus dans tes dossiers"}.</b> Ils ont peut-être été déplacés ou supprimés.</p><button class="btn sm" data-act="reopen">${icon("refresh", "sm")} Relire mes dossiers</button><button class="btn sm ghost" data-act="drop-missing">Les retirer de la bibliothèque</button></div>`;
   const all = miss === L.tracks.size;
   const where = L.rootName ? ` « ${L.rootName} »` : "";
   return html`<div class="banner">${icon("folder")}<p>${all
@@ -31,8 +27,8 @@ function heroHTML() {
 <canvas class="hero-canvas" id="hero-viz" aria-hidden="true"></canvas>
 <h1>Ta musique, rangée et vivante.</h1>
 ${IS_MOBILE ? html`<p>Choisis tes fichiers de musique : aurore lit les tags et les pochettes, range tout par artistes et albums, garde tout dans l'app et fait danser l'écran au rythme de ce que tu écoutes. Rien n'est envoyé sur internet.</p>
-<div class="hero-actions"><button class="btn primary" data-act="import-dir">${icon("plus", "sm")} Ajouter ma musique</button>` : html`<p>${NATIVE_WIN ? "Choisis une fois le dossier où dort ta musique : aurore lit les tags et les pochettes, range tout par artistes et albums, et relit le dossier à chaque lancement pour ajouter les nouveautés. Tes fichiers ne quittent jamais ton ordinateur." : "Ouvre le dossier où dort ta musique : aurore lit les tags et les pochettes, range tout par artistes et albums, et fait danser l'écran au rythme de ce que tu écoutes. Tes fichiers ne quittent jamais ton ordinateur."}</p>
-<div class="hero-actions"><button class="btn primary" data-act="import-dir">${icon("folder", "sm")} ${NATIVE_WIN ? "Choisir mon dossier de musique" : "Ouvrir mon dossier de musique"}</button><button class="btn" data-act="import-files">${icon("files", "sm")} Choisir des fichiers</button>`}<button class="btn ghost" data-act="demo">${icon("play", "sm")} <span class="lbl">Écouter la démo</span></button></div>
+<div class="hero-actions"><button class="btn primary" data-act="import-dir">${icon("plus", "sm")} Ajouter ma musique</button>` : html`<p>${NATIVE_WIN ? `Ton dossier de musique est prêt : ${libraryLabel()}. Mets-y ta musique, ou glisse-la ici : elle apparaît toute seule, rangée par artistes et albums, avec les pochettes. Si ta musique est déjà rangée ailleurs, aurore peut aussi suivre ce dossier.` : "Ouvre le dossier où dort ta musique : aurore lit les tags et les pochettes, range tout par artistes et albums, et fait danser l'écran au rythme de ce que tu écoutes. Tes fichiers ne quittent jamais ton ordinateur."}</p>
+${NATIVE_WIN ? html`<div class="hero-actions"><button class="btn primary" data-act="open-library">${icon("folder", "sm")} Ouvrir mon dossier aurore</button><button class="btn" data-act="import-files">${icon("plus", "sm")} Ajouter des titres</button><button class="btn" data-act="pick-folder">${icon("files", "sm")} Suivre un dossier existant</button>` : html`<div class="hero-actions"><button class="btn primary" data-act="import-dir">${icon("folder", "sm")} Ouvrir mon dossier de musique</button><button class="btn" data-act="import-files">${icon("files", "sm")} Choisir des fichiers</button>`}`}<button class="btn ghost" data-act="demo">${icon("play", "sm")} <span class="lbl">Écouter la démo</span></button></div>
 <div class="dropzone"${raw(CAP ? " hidden" : "")}>${icon("save")}<div><b>Ou glisse ton dossier n'importe où dans la fenêtre.</b><br>MP3, FLAC, M4A, OGG, Opus, WAV · sous-dossiers compris</div></div>
 </section>
 <div class="steps">

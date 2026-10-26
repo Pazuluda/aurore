@@ -53,11 +53,14 @@ const ACTIONS = {
   nav: (el) => { UI.stack = []; UI.go(el.dataset.view, null, { push: false }); if (el.dataset.id === "saved") setTimeout(() => $("#saved")?.scrollIntoView({ behavior: "smooth" }), 60); },
   back: () => UI.back(),
   "import-dir": (el) => {
+    if (NATIVE_WIN) return Menu.open(el, [{ icon: "plus", label: "Ajouter des titres…", fn: () => $("#pick-files").click() }, { icon: "files", label: "Suivre un dossier existant…", fn: () => nativePickFolder() }, "sep", { icon: "folder", label: "Ouvrir mon dossier aurore", fn: () => openLibraryFolder() }]);
     if (!IS_MOBILE) return openFolder();
     if (IS_IOS || CAP) return $("#pick-files").click();
     Menu.open(el, [{ icon: "files", label: "Choisir des titres", fn: () => $("#pick-files").click() }, { icon: "folder", label: "Choisir un dossier entier", fn: () => $("#pick-dir").click() }]);
   },
   install: () => Install.run(),
+  upd: () => Updates.click(),
+  "upd-check": () => Updates.check(true),
   "import-files": () => $("#pick-files").click(),
   reopen: () => reopenFolder(),
   demo: (el) => loadDemo(el),
@@ -114,6 +117,11 @@ const ACTIONS = {
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
   "drop-missing": () => { const ids = [...L.tracks.keys()].filter((id) => !L.files.has(id) && !L.tracks.get(id).demo); removeTracks(ids); UI.onLibraryChanged(); toast(`${plural(ids.length, "titre retiré", "titres retirés")} de la bibliothèque.`); },
   "folder-add": async () => { closeSheet(); await nativePickFolder(); },
+  "open-library": () => openLibraryFolder(),
+  "pick-folder": () => nativePickFolder(),
+  "open-folder": (el) => NATIVE_WIN.openPath(el.dataset.dir),
+  "paths-copy": () => { const p = UI.pendingPaths || []; UI.pendingPaths = null; closeSheet(); nativeImportPaths(p, "copy"); },
+  "paths-link": () => { const p = UI.pendingPaths || []; UI.pendingPaths = null; closeSheet(); nativeImportPaths(p, "link"); },
   "folder-remove": async (el) => { await NATIVE_WIN.removeFolder(el.dataset.dir); await nativeScan({ quiet: true }); if (!(await NATIVE_WIN.getFolders()).length) { removeTracks([...L.tracks.keys()].filter((id) => L.files.get(id)?.disk || !L.files.has(id))); UI.onLibraryChanged(); } openSettings(); },
   "set-clear-yes": async () => { UI.confirmClear = false; closeSheet(); if (NATIVE_WIN) for (const d of await NATIVE_WIN.getFolders()) await NATIVE_WIN.removeFolder(d); await clearLibrary(); Q.ctx = []; Q.order = []; Q.manual = []; Q.current = null; Q.pos = -1; store.set("q", null); UI.setTrackInfo(null); UI.stack = []; UI.go("home", null, { push: false }); UI.onLibraryProgress(); toast("Bibliothèque vidée. Tes fichiers sont intacts."); },
   "set-clear-no": () => { UI.confirmClear = false; openSettings(); },
@@ -153,13 +161,13 @@ async function openSettings() {
   const folders = NATIVE_WIN ? await NATIVE_WIN.getFolders().catch(() => []) : null;
   openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Réglages</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
 <div style="margin-top:10px">
-${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div style="min-width:0"><b>Mes dossiers de musique</b><p>Relus à chaque lancement : ajoute de la musique dedans, elle apparaît toute seule.</p>${folders.map((d) => html`<div class="folder-row"><span class="mono" title="${d}">${d}</span><button class="icon-btn" data-act="folder-remove" data-dir="${d}" aria-label="Retirer ce dossier">${icon("x", "sm")}</button></div>`)}</div><button class="btn sm" data-act="folder-add">${icon("plus", "sm")} Ajouter</button></div>` : ""}
+${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>Mes dossiers de musique</b><p>aurore les surveille : ajoute ou supprime de la musique dedans, la bibliothèque suit toute seule.</p>${folders.map((d) => { const lib = d === NATIVE_LIBRARY; return html`<div class="folder-row"><span class="mono" title="${d}">${lib ? html`<b>Dossier aurore</b> · ` : ""}${d}</span><button class="icon-btn" data-act="open-folder" data-dir="${d}" aria-label="Ouvrir dans l'Explorateur" title="Ouvrir dans l'Explorateur">${icon("external", "sm")}</button>${lib ? "" : html`<button class="icon-btn" data-act="folder-remove" data-dir="${d}" aria-label="Ne plus suivre ce dossier" title="Ne plus suivre">${icon("x", "sm")}</button>`}</div>`; })}</div><button class="btn sm" data-act="folder-add">${icon("plus", "sm")} Suivre un dossier</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${L.memorize}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
 <div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${Viz.calm}" data-act="set-calm" aria-label="Animations douces"></button></div>
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 <div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b><p>La même app, sans navigateur : installateur pour ton PC et APK pour ton téléphone.</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`}
-${IS_NATIVE && APP_VERSION ? html`<div class="set-row"><div><b>Version</b><p>aurore ${APP_VERSION} · ${NATIVE_WIN ? "Windows" : "Android"}</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Versions</a></div>` : ""}
+${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
 </div>`);
 }
@@ -249,7 +257,10 @@ function bindEvents() {
   // fichiers
   const fromInput = (inp) => { const files = [...inp.files]; inp.value = ""; return files.map((f) => ({ file: f, path: f.webkitRelativePath || f.name })); };
   $("#pick-dir").addEventListener("change", (e) => { const list = fromInput(e.target); if (list.length) importEntries(list); });
-  $("#pick-files").addEventListener("change", (e) => { const list = fromInput(e.target); if (list.length) importEntries(list); });
+  $("#pick-files").addEventListener("change", (e) => {
+    if (NATIVE_WIN && NATIVE_WIN.pathFor) { const paths = [...e.target.files].map((f) => NATIVE_WIN.pathFor(f)).filter(Boolean); e.target.value = ""; if (paths.length) return nativeAddPaths(paths); }
+    const list = fromInput(e.target); if (list.length) importEntries(list);
+  });
   let depth = 0; const drop = $("#drop");
   const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
   window.addEventListener("dragenter", (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; drop.hidden = false; });
@@ -257,6 +268,7 @@ function bindEvents() {
   window.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) drop.hidden = true; });
   window.addEventListener("drop", async (e) => {
     if (!hasFiles(e)) return; e.preventDefault(); depth = 0; drop.hidden = true;
+    if (NATIVE_WIN && NATIVE_WIN.pathFor) { const paths = [...e.dataTransfer.files].map((f) => NATIVE_WIN.pathFor(f)).filter(Boolean); if (paths.length) return nativeAddPaths(paths); }
     const items = [...(e.dataTransfer.items || [])];
     const entries = items.map((it) => (it.webkitGetAsEntry ? it.webkitGetAsEntry() : null)).filter(Boolean);
     let out = [];
@@ -298,17 +310,23 @@ async function boot() {
   const startView = (location.hash || "").replace("#", "");
   if (["tracks", "albums", "artists", "discover"].includes(startView)) UI.view = { name: startView, param: null };
   UI.render(); UI.onLibraryProgress();
+  setTimeout(() => { document.documentElement.classList.add("booted"); setTimeout(() => $("#boot")?.remove(), 600); }, Math.max(0, 900 - performance.now()));
   Q.restore();
   UI.bindImmGestures();
   Install.init();
   window.addEventListener("popstate", () => UI.onPop());
   if (CAP) { $("#pick-files").accept = "audio/*"; L.memorize = true; }
-  if (NATIVE_WIN) NATIVE_WIN.onOpenFiles(openNativeFiles);
+  if (NATIVE_WIN) {
+    NATIVE_WIN.onOpenFiles(openNativeFiles);
+    try { NATIVE_LIBRARY = await NATIVE_WIN.library(); } catch { /* ancienne version */ }
+    if (NATIVE_WIN.onChanged) NATIVE_WIN.onChanged(() => nativeScan({ quiet: true }));
+    if (!L.tracks.size) UI.render();
+  }
   UI.syncControls(); UI.syncTime();
   Disc.init();
   await autoReattach();
   if (Q.current && !Player.id && L.files.has(Q.current)) { Q.session = { id: Q.current, listened: 0, counted: false, last: null }; Player.load(Q.current, { autoplay: false, startAt: store.get("q", {})?.t || 0 }); }
-  setTimeout(checkUpdate, 4000);
+  Updates.init();
 }
 /* Windows : fichiers audio lâchés sur l'icône d'aurore */
 async function openNativeFiles(list) {

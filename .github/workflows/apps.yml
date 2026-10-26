@@ -44,7 +44,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: aurore-windows
-          path: apps/windows/dist/aurore-windows-setup.exe
+          path: |
+            apps/windows/dist/aurore-windows-setup.exe
+            apps/windows/dist/aurore-windows-setup.exe.blockmap
+            apps/windows/dist/latest.yml
           if-no-files-found: error
 
   android:
@@ -122,6 +125,8 @@ jobs:
           make_latest: true
           files: |
             out/aurore-windows-setup.exe
+            out/aurore-windows-setup.exe.blockmap
+            out/latest.yml
             out/aurore-android.apk
           body: |
             **Windows** : télécharge `aurore-windows-setup.exe` et lance-le. aurore s'installe toute seule et s'ouvre.
@@ -129,4 +134,4 @@ jobs:
 
             **Android** : télécharge `aurore-android.apk` depuis ton téléphone et ouvre-le. Si Android le demande, autorise ton navigateur à installer des applications.
 
-            Pour mettre à jour, installe la nouvelle version par-dessus : ta musique, tes playlists et tes statistiques sont conservées.
+            **Mises à jour** : sur Windows, aurore se met à jour toute seule (logo en haut de la fenêtre). Sur Android, le logo de mise à jour apparaît en haut de l'app : il télécharge la nouvelle version, à installer par-dessus. Ta musique, tes playlists et tes statistiques sont conservées.

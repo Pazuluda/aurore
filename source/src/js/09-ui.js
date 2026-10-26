@@ -208,6 +208,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
 
   /* ---- bannière fichiers manquants ---- */
   needFiles() {
+    if (NATIVE_WIN) { toast("Ce titre n'est plus sur ton PC.", { action: { label: "Relire mes dossiers", fn: () => nativeScan() } }); return this.rerender(); }
     toast(L.rootName ? `Rouvre ton dossier « ${L.rootName} » pour écouter.` : "Rouvre ton dossier de musique pour écouter.", { action: { label: "Rouvrir", fn: () => reopenFolder() } });
     this.rerender();
   },

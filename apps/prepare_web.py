@@ -30,6 +30,7 @@ if m:
         print("polices restées en ligne :", e)
 
 html = html.replace('<link rel="manifest" href="manifest.webmanifest">\n', "")
+html = html.replace('<html lang="fr">', '<html lang="fr" class="boot">', 1)  # écran de démarrage avec le logo
 html = html.replace('<meta charset="utf-8">', f'<meta charset="utf-8">\n<meta name="aurore-version" content="{version}">', 1)
 (dest / "index.html").write_text(html, encoding="utf-8")
 print("web prêt dans", dest, "version", version)

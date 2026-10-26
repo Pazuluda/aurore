@@ -641,3 +641,39 @@ kbd { font: 500 12px var(--f-mono); padding: 2px 7px; border-radius: 6px; border
 .folder-row { display: flex; align-items: center; gap: 4px; margin-top: 8px; padding: 4px 4px 4px 10px; border-radius: 8px; background: rgba(255, 255, 255, .05); }
 .folder-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text-2); }
 .folder-row .icon-btn { width: 30px; height: 30px; }
+.choice { display: grid; gap: 10px; margin-top: 16px; }
+.choice-btn { display: flex; flex-direction: column; gap: 6px; text-align: left; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line-2); background: rgba(255, 255, 255, .04); transition: background var(--t-fast), border-color var(--t-fast); }
+.choice-btn:hover { background: rgba(255, 255, 255, .08); border-color: var(--c1); }
+.choice-btn b { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.choice-btn b .ic { color: var(--c1); }
+.choice-btn span { font-size: 13px; color: var(--text-3); }
+
+/* ---------- écran de démarrage (apps) ---------- */
+#boot { display: none; }
+html.boot #boot { position: fixed; inset: 0; z-index: 95; display: grid; place-content: center; justify-items: center; gap: 20px; background: radial-gradient(60% 50% at 50% 42%, #1f1b40, #07070d 72%); transition: opacity .5s var(--ease-out), visibility .5s; }
+html.booted #boot { opacity: 0; visibility: hidden; }
+.boot-mark { display: flex; align-items: flex-end; gap: 9px; height: 76px; }
+.boot-mark span { width: 15px; height: 100%; border-radius: 8px; background: linear-gradient(#a08cff, #3fe0c5); transform-origin: bottom; animation: bootbar 1.1s ease-in-out infinite; }
+.boot-mark span:nth-child(1) { height: 42%; animation-delay: -.2s; }
+.boot-mark span:nth-child(2) { height: 78%; animation-delay: -.55s; }
+.boot-mark span:nth-child(3) { height: 58%; animation-delay: -.1s; }
+.boot-mark span:nth-child(4) { height: 95%; animation-delay: -.75s; }
+@keyframes bootbar { 0%, 100% { transform: scaleY(.55); } 50% { transform: scaleY(1); } }
+.boot-name { font: 700 30px/1 var(--f-display); letter-spacing: -.03em; color: var(--text); }
+
+/* ---------- logo de mise à jour ---------- */
+.upd { position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; flex: none; border-radius: 50%; color: var(--text-2); transition: background var(--t-fast), color var(--t-fast); }
+.upd:hover { background: rgba(255, 255, 255, .07); color: var(--text); }
+.upd.checking .ic { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.upd.error::after { content: ""; position: absolute; top: 8px; right: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); }
+.upd .ring { position: absolute; inset: 3px; width: calc(100% - 6px); height: calc(100% - 6px); transform: rotate(-90deg); }
+.upd .ring circle { fill: none; stroke-width: 3; }
+.upd .ring-bg { stroke: rgba(255, 255, 255, .12); }
+.upd .ring-fg { stroke: var(--c2); stroke-dasharray: 94.25; stroke-linecap: round; transition: stroke-dashoffset .4s; }
+.upd.downloading { color: var(--c2); }
+.upd.ready { width: auto; height: 34px; padding: 0 14px 0 11px; display: inline-flex; gap: 7px; border-radius: 999px; background: var(--c1); color: var(--on-c1); font-weight: 700; font-size: 13px; animation: updglow 2.2s ease-in-out infinite; }
+.upd.ready:hover { background: var(--c1); filter: brightness(1.08); }
+@keyframes updglow { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c1) 55%, transparent); } 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--c1) 0%, transparent); } }
+.native-win #upd { position: fixed; top: 3px; right: 146px; z-index: 37; width: 30px; height: 30px; -webkit-app-region: no-drag; }
+.native-win #upd.ready { width: auto; height: 28px; top: 4px; font-size: 12px; }
