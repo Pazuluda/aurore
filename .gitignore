@@ -1,0 +1,9 @@
+source/dist/
+apps/windows/node_modules/
+apps/windows/dist/
+apps/windows/app/
+apps/android/node_modules/
+apps/android/android/
+apps/android/www/
+apps/android/*.apk
+*.p12

@@ -1,0 +1,55 @@
+<div class="aurora" id="aurora" aria-hidden="true"><div class="aurora-pulse" id="aurora-pulse"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div></div>
+<div class="grain" aria-hidden="true"></div>
+
+<div class="app" id="app">
+  <aside class="side pane" id="side" aria-label="Bibliothèque">
+    <div class="brand">
+      <div class="brand-mark" id="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <span class="brand-name">aurore</span>
+    </div>
+    <nav class="nav" id="nav" aria-label="Navigation principale"></nav>
+    <div class="side-sec">
+      <span class="eyebrow">Playlists</span>
+      <button class="icon-btn" data-act="new-playlist" aria-label="Nouvelle playlist" title="Nouvelle playlist"></button>
+    </div>
+    <div class="side-lists" id="side-lists"></div>
+    <div class="side-foot">
+      <div id="install-slot"></div>
+      <div class="lib-status" id="lib-status" aria-live="polite"></div>
+      <div class="side-actions">
+        <button class="btn sm" data-act="import-dir" style="flex:1"></button>
+        <button class="icon-btn" data-act="settings" aria-label="Réglages" title="Réglages"></button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main pane" id="main">
+    <header class="topbar">
+      <button class="icon-btn" data-act="back" id="back-btn" aria-label="Retour" title="Retour" hidden></button>
+      <label class="search">
+        <span class="sr">Rechercher dans ta musique</span>
+        <span id="search-ic"></span>
+        <input id="q" type="search" placeholder="Titre, artiste, album…" autocomplete="off" spellcheck="false">
+        <span class="kbd" aria-hidden="true">/</span>
+      </label>
+      <span class="spacer"></span>
+      <button class="btn" data-act="import-dir" id="top-import"></button>
+      <button class="icon-btn" data-act="toggle-np" id="np-toggle" aria-label="Afficher le panneau En cours" title="Panneau En cours"></button>
+    </header>
+    <div class="scroll" id="scroll"><div id="view"></div></div>
+  </main>
+
+  <aside class="np pane" id="np" aria-label="En cours de lecture"></aside>
+
+  <footer class="dock" id="dock" aria-label="Lecteur"></footer>
+
+  <nav class="tabs" id="tabs" aria-label="Navigation"></nav>
+</div>
+
+<div class="imm" id="imm" hidden role="dialog" aria-modal="true" aria-label="Mode immersif"></div>
+<div class="drop" id="drop" hidden><div class="drop-card"><div id="drop-ic"></div><h2>Lâche ta musique ici</h2><p>Un dossier entier ou quelques fichiers, tout se range tout seul.</p></div></div>
+<div class="menu" id="menu" hidden role="menu"></div>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<input type="file" id="pick-dir" webkitdirectory directory multiple hidden>
+<input type="file" id="pick-files" multiple accept="audio/*,.mp3,.flac,.m4a,.aac,.ogg,.oga,.opus,.wav,.webm,.weba" hidden>

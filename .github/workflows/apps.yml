@@ -1,0 +1,132 @@
+name: Apps Windows et Android
+
+# À chaque envoi sur main : construit l'installateur Windows (.exe) et l'APK Android,
+# puis les publie dans « Releases ». Le site (index.html) reste servi par GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["README.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apps-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERSION: 1.0.${{ github.run_number }}
+
+jobs:
+  windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Préparer le lecteur
+        run: python apps/prepare_web.py apps/windows/app "$VERSION"
+      - name: Construire l'installateur
+        working-directory: apps/windows
+        run: |
+          npm install --no-audit --no-fund
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+          npx electron-builder --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aurore-windows
+          path: apps/windows/dist/aurore-windows-setup.exe
+          if-no-files-found: error
+
+  android:
+    name: Android (.apk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Préparer le lecteur
+        run: python3 apps/prepare_web.py apps/android/www "$VERSION"
+      - name: Créer le projet Android
+        working-directory: apps/android
+        run: |
+          npm install --no-audit --no-fund
+          npx cap add android
+          python3 patch_android.py "$VERSION" "${{ github.run_number }}"
+          npx cap sync android
+      - name: Compiler l'APK
+        working-directory: apps/android/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+      - name: Signer l'APK
+        working-directory: apps/android/android
+        env:
+          KS_B64: ${{ secrets.AURORE_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.AURORE_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/aurore.p12"
+          else
+            echo "::warning::Secrets AURORE_KEYSTORE_B64 / AURORE_KEYSTORE_PASSWORD absents : APK signé avec une clé temporaire. Pour l'installer, désinstalle d'abord une version signée autrement."
+            export KS_PASS=$(openssl rand -hex 16)
+            touch ../SIGNATURE_TEMPORAIRE
+            keytool -genkeypair -keystore "$RUNNER_TEMP/aurore.p12" -storetype PKCS12 -alias aurore -keyalg RSA -keysize 3072 -validity 10950 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=aurore temporaire"
+          fi
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          "$BT/apksigner" sign --ks "$RUNNER_TEMP/aurore.p12" --ks-type PKCS12 --ks-pass env:KS_PASS --ks-key-alias aurore --key-pass env:KS_PASS --out ../aurore-android.apk aligned.apk
+          rm -f "$RUNNER_TEMP/aurore.p12"
+          "$BT/apksigner" verify --print-certs ../aurore-android.apk | head -2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aurore-android
+          path: |
+            apps/android/aurore-android.apk
+            apps/android/SIGNATURE_TEMPORAIRE
+          if-no-files-found: error
+
+  release:
+    name: Publier dans Releases
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: APK signé avec la clé du dépôt seulement
+        run: |
+          if [ -f out/SIGNATURE_TEMPORAIRE ]; then
+            echo "::warning::APK non publié : ajoute les secrets AURORE_KEYSTORE_B64 et AURORE_KEYSTORE_PASSWORD, puis relance."
+            rm -f out/aurore-android.apk
+          fi
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: aurore ${{ env.VERSION }}
+          make_latest: true
+          files: |
+            out/aurore-windows-setup.exe
+            out/aurore-android.apk
+          body: |
+            **Windows** : télécharge `aurore-windows-setup.exe` et lance-le. aurore s'installe toute seule et s'ouvre.
+            Windows peut afficher « Windows a protégé votre ordinateur », parce que l'app n'est pas signée par un éditeur payant : clique sur « Informations complémentaires », puis « Exécuter quand même ».
+
+            **Android** : télécharge `aurore-android.apk` depuis ton téléphone et ouvre-le. Si Android le demande, autorise ton navigateur à installer des applications.
+
+            Pour mettre à jour, installe la nouvelle version par-dessus : ta musique, tes playlists et tes statistiques sont conservées.

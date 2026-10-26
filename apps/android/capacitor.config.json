@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.pazuluda.aurore",
+  "appName": "aurore",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#07070d",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}

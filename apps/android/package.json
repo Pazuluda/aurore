@@ -1,0 +1,14 @@
+{
+  "name": "aurore-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "aurore pour Android (Capacitor)",
+  "dependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/core": "6.2.1",
+    "@jofr/capacitor-media-session": "4.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "6.2.1"
+  }
+}

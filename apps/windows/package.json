@@ -1,0 +1,44 @@
+{
+  "name": "aurore",
+  "productName": "aurore",
+  "version": "1.0.0",
+  "description": "Ta musique, rangée et vivante",
+  "author": "Pazuluda",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.3",
+    "electron-builder": "26.0.12"
+  },
+  "build": {
+    "appId": "io.github.pazuluda.aurore",
+    "productName": "aurore",
+    "executableName": "aurore",
+    "copyright": "Pazuluda",
+    "directories": { "output": "dist", "buildResources": "build" },
+    "files": ["main.js", "preload.js", "icon.png", "app/**/*"],
+    "asar": true,
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "aurore-windows-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "aurore",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "uninstallDisplayName": "aurore"
+    }
+  }
+}
