@@ -1,0 +1,38 @@
+{
+  "id": "./",
+  "name": "aurore",
+  "short_name": "aurore",
+  "description": "Ta musique, rangée et vivante : bibliothèque automatique, visualiseurs animés et découvertes d'artistes.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07070d",
+  "theme_color": "#07070d",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Titres", "url": "./#tracks", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Albums", "url": "./#albums", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Découvertes", "url": "./#discover", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "file_handlers": [
+    {
+      "action": "./",
+      "accept": {
+        "audio/mpeg": [".mp3"],
+        "audio/flac": [".flac"],
+        "audio/mp4": [".m4a", ".aac"],
+        "audio/ogg": [".ogg", ".oga", ".opus"],
+        "audio/wav": [".wav"]
+      },
+      "launch_type": "single-client"
+    }
+  ]
+}
