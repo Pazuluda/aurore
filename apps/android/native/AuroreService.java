@@ -60,7 +60,7 @@ public class AuroreService extends MediaLibraryService {
                 return new DefaultAudioSink.Builder(context)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                    .setAudioProcessors(new AudioProcessor[] { new TeeAudioProcessor(TAP) })
+                    .setAudioProcessors(new AudioProcessor[] { new AuroreFx(), new TeeAudioProcessor(TAP) })
                     .build();
             }
         };
@@ -90,6 +90,13 @@ public class AuroreService extends MediaLibraryService {
         instance = this;
         // widget de l'écran d'accueil : suit le titre et la lecture
         player.addListener(new androidx.media3.common.Player.Listener() {
+            @Override
+            public void onMediaItemTransition(MediaItem item, int reason) {
+                // volume égalisé : chaque titre arrive avec son propre réglage
+                android.os.Bundle x = item != null ? item.mediaMetadata.extras : null;
+                AuroreFx.setTrack(x != null ? x.getFloat("gain", 0f) : 0f);
+            }
+
             @Override
             public void onEvents(androidx.media3.common.Player p, androidx.media3.common.Player.Events e) {
                 if (e.containsAny(
@@ -129,7 +136,14 @@ public class AuroreService extends MediaLibraryService {
 
     /** titre jouable : mediaId = identifiant du titre dans aurore */
     static MediaItem track(String id, long mid, String title, String artist, String album, String art) {
+        return track(id, mid, title, artist, album, art, 0f);
+    }
+
+    static MediaItem track(String id, long mid, String title, String artist, String album, String art, float gainDb) {
+        android.os.Bundle extras = new android.os.Bundle();
+        extras.putFloat("gain", gainDb);
         MediaMetadata.Builder md = new MediaMetadata.Builder()
+            .setExtras(extras)
             .setTitle(title)
             .setArtist(artist)
             .setAlbumTitle(album)

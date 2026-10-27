@@ -1,5 +1,5 @@
 /* ===================== découvertes (Claude, via la capacité « sample ») ===================== */
-const MOODS = [
+const DISC_MOODS = [
   ["proche", "Dans la même veine", "dans la même veine que mes artistes préférés"],
   ["pepites", "Pépites peu connues", "des pépites peu connues, avec peu d'écoutes sur les plateformes, mais qui restent dans mes goûts"],
   ["calme", "Plus calme", "plus calme, doux et posé que ce que j'écoute d'habitude, sans changer complètement de style"],
@@ -30,7 +30,7 @@ const Disc = {
     const lines = s.list.map((a) => `- ${a.name}${a.plays ? ` (${a.plays} écoutes)` : a.tracks ? ` (${a.tracks} titres)` : ""}${a.genre ? ` — ${a.genre}` : ""}`).join("\n");
     const genres = L.genres.slice(0, 8).map((g) => g.name).join(", ");
     const known = [...new Set([...[...L.artists.values()].map((a) => a.name).filter((n) => n !== UNKNOWN_ARTIST), ...this.seen, ...L.saved.map((x) => x.artist)])].slice(0, forChat ? 60 : 300).join(", ");
-    const mood = (MOODS.find((m) => m[0] === this.mood) || MOODS[0])[2];
+    const mood = (DISC_MOODS.find((m) => m[0] === this.mood) || DISC_MOODS[0])[2];
     return `Tu es un disquaire passionné, curieux et pointu. Recommande-moi 8 artistes à découvrir.
 
 ${s.kind === "plays" ? "Ce que j'écoute le plus dans mon lecteur (nombre d'écoutes) :" : "Les artistes les plus présents dans ma bibliothèque :"}
@@ -97,7 +97,7 @@ ${forChat ? "Présente chaque artiste avec : son nom, son genre, le pays et l'é
     const initials = it.artist.replace(/^(the|les|le|la)\s+/i, "").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
     const isSaved = L.saved.some((x) => norm(x.artist) === norm(it.artist));
     return html`<article class="dcard" style="--dc:hsl(${hue} 72% 68%);animation-delay:${saved ? 0 : Math.min(i, 7) * 40}ms">
-<div class="dc-actions">${saved ? html`<button class="icon-btn" data-act="unsave-artist" data-i="${i}" aria-label="Retirer de ma liste">${icon("x", "sm")}</button>` : html`<button class="icon-btn${isSaved ? " on" : ""}" data-act="save-artist" data-i="${i}" aria-pressed="${isSaved}" aria-label="${isSaved ? "Déjà dans ma liste" : "Garder dans ma liste À découvrir"}" title="Garder pour plus tard">${icon("bookmark", "sm")}</button><button class="icon-btn" data-act="dismiss-artist" data-i="${i}" aria-label="Pas pour moi" title="Pas pour moi">${icon("x", "sm")}</button>`}</div>
+<div class="dc-actions">${saved ? html`<button class="icon-btn" data-act="unsave-artist" data-i="${i}" aria-label="Retirer de ma liste">${icon("x", "sm")}</button>` : html`<button class="icon-btn${isSaved ? " on" : ""}" data-act="save-artist" data-i="${i}" aria-pressed="${String(isSaved)}" aria-label="${isSaved ? "Déjà dans ma liste" : "Garder dans ma liste À découvrir"}" title="Garder pour plus tard">${icon("bookmark", "sm")}</button><button class="icon-btn" data-act="dismiss-artist" data-i="${i}" aria-label="Pas pour moi" title="Pas pour moi">${icon("x", "sm")}</button>`}</div>
 <div class="dc-top"><span class="dc-av" aria-hidden="true">${initials}</span><div style="min-width:0;padding-right:64px"><h3 class="dc-name">${it.artist}</h3><div class="dc-genre">${[it.genre, it.from].filter(Boolean).join(" · ")}</div></div></div>
 ${it.because ? html`<p class="dc-why">${it.because}</p>` : ""}
 ${it.tracks.length ? html`<div class="dc-tracks">${it.tracks.map((t) => html`<a href="${this.links(it.artist, t).yt}" target="_blank" rel="noopener noreferrer">${icon("play")}<span>${t}</span></a>`)}</div>` : ""}
@@ -109,7 +109,7 @@ ${it.tracks.length ? html`<div class="dc-tracks">${it.tracks.map((t) => html`<a 
     const head = html`<div class="view-head"><div><h1 class="h-page">Découvertes</h1><div class="sub">Des artistes choisis d'après ce que tu écoutes le plus.</div></div></div>`;
     if (!s.list.length) return html`${head}<div class="empty"><div class="big-ic">${icon("sparkles", "lg")}</div><h2>Il me faut un peu de ta musique</h2><p>Les suggestions partent des artistes que tu écoutes. Ajoute ton dossier de musique, écoute quelques titres, puis reviens ici.</p><button class="btn primary" data-act="import-dir">${icon("folder", "sm")} Ouvrir mon dossier</button></div>${this.savedHTML()}`;
     const seedsHTML = html`<div class="disc-seeds">${this.seed ? html`<span class="seed">Autour de ${this.seed}</span><button class="chip" style="height:26px" data-act="disc-seed-clear">Revenir à mes favoris</button>` : s.list.slice(0, 8).map((a) => html`<span class="seed">${a.name}${a.plays ? html` <span class="mono">${a.plays}</span>` : ""}</span>`)}</div>`;
-    const moods = html`<div class="chips" style="margin-top:14px" role="group" aria-label="Envie du moment">${MOODS.map(([k, l]) => html`<button class="chip" data-act="disc-mood" data-key="${k}" aria-pressed="${this.mood === k}">${l}</button>`)}</div>`;
+    const moods = html`<div class="chips" style="margin-top:14px" role="group" aria-label="Envie du moment">${DISC_MOODS.map(([k, l]) => html`<button class="chip" data-act="disc-mood" data-key="${k}" aria-pressed="${String(this.mood === k)}">${l}</button>`)}</div>`;
     let action;
     if (this.api === undefined) action = html`<button class="btn" disabled>Connexion à Claude…</button>`;
     else if (this.api === null || this.state === "denied") action = "";

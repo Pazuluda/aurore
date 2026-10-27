@@ -216,7 +216,7 @@ public class AuroreMusicPlugin extends Plugin {
         if (arr == null) return list;
         for (int i = 0; i < arr.length(); i++) {
             JSONObject o = arr.getJSONObject(i);
-            list.add(AuroreService.track(o.getString("id"), o.getLong("mid"), o.optString("title", ""), o.optString("artist", ""), o.optString("album", ""), o.optString("art", "")));
+            list.add(AuroreService.track(o.getString("id"), o.getLong("mid"), o.optString("title", ""), o.optString("artist", ""), o.optString("album", ""), o.optString("art", ""), (float) o.optDouble("gain", 0)));
         }
         return list;
     }
@@ -361,6 +361,21 @@ public class AuroreMusicPlugin extends Plugin {
             return;
         }
         withPlayer(call, (p) -> call.resolve(state(p, true, -1)));
+    }
+
+    /* ---- égaliseur et volume égalisé ---- */
+
+    @PluginMethod
+    public void pfx(PluginCall call) {
+        JSArray eq = call.getArray("eq");
+        if (eq != null) {
+            float[] db = new float[6];
+            for (int i = 0; i < 6 && i < eq.length(); i++) db[i] = (float) eq.optDouble(i, 0);
+            AuroreFx.setEq(db, call.getBoolean("eqOn", false), (float) (double) call.getDouble("preamp", 0.0), call.getBoolean("norm", true));
+        }
+        Double track = call.getDouble("track");
+        if (track != null) AuroreFx.setTrack((float) (double) track);
+        call.resolve();
     }
 
     /* ---- mise à jour de l'app, entièrement dans l'app ---- */

@@ -67,8 +67,19 @@ function artistTrackIds(key) {
   const T = (id) => L.tracks.get(id);
   return ar.tracks.slice().sort((a, b) => playsOf(b) - playsOf(a) || (T(b).year || 0) - (T(a).year || 0) || cmp(T(a).album, T(b).album) || (T(a).disc - T(b).disc) || (T(a).track - T(b).track));
 }
+function moodCard(m, n) {
+  return html`<button class="mood" data-act="open-list" data-id="mood:${m.k}" style="--m1:${m.c[0]};--m2:${m.c[1]}" aria-label="${m.name}, ${plural(n, "titre", "titres")}"><span class="mood-ic">${icon(m.ic)}</span><b>${m.name}</b><small>${n ? plural(n, "titre", "titres") : m.hint}</small><span class="mini-play" data-act="play-ctx" data-ctx="list:mood:${m.k}" aria-hidden="true">${icon("play")}</span></button>`;
+}
+function moodsHTML(compact) {
+  const mo = An.moods(), any = HUMEURS.some((m) => mo[m.k].length);
+  const left = An.total - An.done;
+  const prog = left > 0 ? html`<p class="mood-prog"><span class="pulse-dot"></span>J'écoute ta musique pour la ranger par humeur : ${An.done} / ${An.total}</p>` : "";
+  if (!any && !left) return "";
+  return html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Selon ton humeur</h2></div>${prog}${any ? html`<div class="moods${compact ? " compact" : ""}">${HUMEURS.map((m) => moodCard(m, mo[m.k].length))}</div>` : ""}</section>`;
+}
 function listSpec(id) {
   const hasT = (x) => L.tracks.has(x);
+  if (id.startsWith("mood:")) { const m = An.moodOf(id.slice(5)); if (!m) return null; return { name: m.name, kind: "Humeur", ids: (An.moods()[m.k] || []).filter(hasT), auto: true, ic: m.ic, mood: m, empty: An.total > An.done ? `aurore écoute encore ta musique (${An.done} / ${An.total}) : reviens dans un moment.` : "Aucun titre ne correspond vraiment à cette humeur pour l'instant." }; }
   if (id === "liked") return { name: "Titres likés", kind: "Playlist", ids: [...L.likes].reverse().filter(hasT), auto: true, ic: "heart", empty: "Touche le cœur à côté d'un titre pour le retrouver ici." };
   if (id === "top") return { name: "Les plus écoutés", kind: "Playlist auto", ids: topTracks(50), auto: true, ic: "bars", empty: "Écoute un peu de musique : tes 50 titres préférés apparaîtront ici, classés par nombre d'écoutes." };
   if (id === "never") return { name: "Jamais écoutés", kind: "Playlist auto", ids: L.sorted.tracks.filter((x) => !playsOf(x)).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)), auto: true, ic: "sparkles", empty: "Tu as tout écouté. Respect." };
@@ -117,6 +128,7 @@ const VIEWS = {
     return html`${installCard()}<div class="view-head"><div><h1 class="h-page">${greet}</h1><div class="sub">${plural(L.tracks.size, "titre", "titres")} · ${plural(L.albums.size, "album", "albums")} · ${plural(L.artists.size, "artiste", "artistes")} · ${fmtLong(dur)} de musique</div></div></div>
 <div class="tiles n${nT}">${tiles.slice(0, nT).map((t) => html`<button class="tile" style="--tc:${t.tc}" data-act="${t.act}" ${raw(t.id ? `data-id="${esc(t.id)}"` : "")} ${raw(t.key ? `data-key="${esc(t.key)}"` : "")} ${raw(t.act === "play-ctx" ? `data-ctx="${esc(t.ctx)}"` : "")}><span class="tile-art">${t.art && artSmall(t.art) ? html`<img src="${artSmall(t.art)}" alt="">` : icon(t.ic || "disc")}</span><span class="tile-name">${t.name}</span><span class="mini-play" data-act="play-ctx" data-ctx="${t.ctx}" aria-hidden="true">${icon("play")}</span></button>`)}</div>
 ${shelf("Écouté récemment", recents.map(albumCard))}
+${moodsHTML()}
 ${shelf("Tes playlists", L.playlists.map(playlistCard))}
 ${shelf(tops.length >= 3 ? "Tes artistes du moment" : "Tes artistes", artistKeys.map(artistCard), ["artists", "Tout afficher"])}
 ${shelf("Ajoutés récemment", added.map(albumCard), ["albums", "Tout afficher"])}
@@ -142,8 +154,8 @@ ${trackList(ids, { sort: UI.trackSort, label: "Tous les titres", ref: "tracks" }
     list.sort(s === "title" ? (a, b) => cmp(sortKey(a.title), sortKey(b.title)) : s === "recent" ? (a, b) => b.addedAt - a.addedAt : s === "year" ? (a, b) => (b.year || 0) - (a.year || 0) || cmp(a.title, b.title) : s === "plays" ? (a, b) => b.plays - a.plays || cmp(a.title, b.title) : (a, b) => cmp(sortKey(a.artist), sortKey(b.artist)) || (a.year - b.year) || cmp(a.title, b.title));
     const genres = L.genres.slice(0, 10);
     return html`<div class="view-head"><div><h1 class="h-page">Albums</h1><div class="sub">${plural(list.length, "album", "albums")}${UI.albumGenre ? " · " + UI.albumGenre : ""}</div></div></div>
-<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${sorts.map(([k, l]) => html`<button class="chip" data-act="album-sort" data-key="${k}" aria-pressed="${s === k}">${l}</button>`)}</div>
-${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="group" aria-label="Filtrer par genre"><button class="chip" data-act="album-genre" data-key="" aria-pressed="${!UI.albumGenre}">Tous les genres</button>${genres.map((g) => html`<button class="chip" data-act="album-genre" data-key="${g.name}" aria-pressed="${UI.albumGenre === g.name}">${g.name}</button>`)}</div>` : ""}
+<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${sorts.map(([k, l]) => html`<button class="chip" data-act="album-sort" data-key="${k}" aria-pressed="${String(s === k)}">${l}</button>`)}</div>
+${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="group" aria-label="Filtrer par genre"><button class="chip" data-act="album-genre" data-key="" aria-pressed="${String(!UI.albumGenre)}">Tous les genres</button>${genres.map((g) => html`<button class="chip" data-act="album-genre" data-key="${g.name}" aria-pressed="${String(UI.albumGenre === g.name)}">${g.name}</button>`)}</div>` : ""}
 <div class="grid" style="margin-top:24px">${list.map((a) => albumCard(a.key))}</div>`;
   },
 
@@ -152,7 +164,7 @@ ${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="grou
     const s = UI.artistSort;
     const list = [...L.artists.values()].sort(s === "plays" ? (a, b) => b.plays - a.plays || cmp(a.name, b.name) : s === "tracks" ? (a, b) => b.tracks.length - a.tracks.length : (a, b) => cmp(artistSortKey(a.name), artistSortKey(b.name)));
     return html`<div class="view-head"><div><h1 class="h-page">Artistes</h1><div class="sub">${plural(list.length, "artiste", "artistes")}</div></div></div>
-<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${[["az", "A → Z"], ["plays", "Les plus écoutés"], ["tracks", "Le plus de titres"]].map(([k, l]) => html`<button class="chip" data-act="artist-sort" data-key="${k}" aria-pressed="${s === k}">${l}</button>`)}</div>
+<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${[["az", "A → Z"], ["plays", "Les plus écoutés"], ["tracks", "Le plus de titres"]].map(([k, l]) => html`<button class="chip" data-act="artist-sort" data-key="${k}" aria-pressed="${String(s === k)}">${l}</button>`)}</div>
 <div class="grid" style="margin-top:24px">${list.map((a) => artistCard(a.key))}</div>`;
   },
 
@@ -166,7 +178,7 @@ ${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="grou
 <div class="dhead-line">${a.artist !== "Artistes variés" ? html`<button data-act="open-artist" data-key="${norm(a.artist)}"><b>${a.artist}</b></button>` : html`<b>Artistes variés</b>`}${a.year ? html`<span class="dot">${a.year}</span>` : ""}<span class="dot">${plural(a.tracks.length, "titre", "titres")}, ${fmtLong(a.duration)}</span>${a.genre ? html`<span class="dot">${a.genre}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire l'album">${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
-<button class="icon-btn heart${allLiked ? " on" : ""}" data-act="like-many" data-ctx="${ref}" aria-pressed="${allLiked}" aria-label="${allLiked ? "Retirer l'album des titres likés" : "Liker tout l'album"}">${icon("heart")}</button>
+<button class="icon-btn heart${allLiked ? " on" : ""}" data-act="like-many" data-ctx="${ref}" aria-pressed="${String(allLiked)}" aria-label="${allLiked ? "Retirer l'album des titres likés" : "Liker tout l'album"}">${icon("heart")}</button>
 <button class="icon-btn" data-act="ctx-menu" data-ctx="${ref}" aria-label="Plus d'options">${icon("more")}</button></div>
 ${trackList(a.tracks, { album: false, cover: false, numbering: "track", discs: a.discs > 1, label: a.title, ref })}
 ${others.length ? shelf(`Plus de ${a.artist}`, others.map(albumCard)) : ""}`;
@@ -197,7 +209,7 @@ ${feat.length ? shelf("Apparaît sur", feat.map((a) => albumCard(a.key))) : ""}`
     const ref = "list:" + id;
     let dur = 0; for (const x of s.ids) dur += L.tracks.get(x).duration || 0;
     const arts = [...new Set(s.ids.map((x) => L.tracks.get(x).artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
-    const cover = s.auto ? html`<div class="cover" style="--cc:transparent;background:linear-gradient(135deg,var(--c1),var(--c3))"><div class="ph" style="background:none;color:var(--on-c1)">${icon(s.ic)}</div></div>`
+    const cover = s.auto ? html`<div class="cover" style="--cc:transparent;background:linear-gradient(135deg,${s.mood ? s.mood.c[0] : "var(--c1)"},${s.mood ? s.mood.c[1] : "var(--c3)"})"><div class="ph" style="background:none;color:var(--on-c1)">${icon(s.ic)}</div></div>`
       : html`<div class="cover" style="--cc:${placeholderColor(s.name)}">${arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`}</div>`;
     const editing = UI.editing === id;
     return html`<header class="dhead" style="--hc:${s.auto ? "var(--c1)" : placeholderColor(s.name)}">${cover}
@@ -220,8 +232,10 @@ ${s.ids.length ? trackList(s.ids, { label: s.name, ref, playlist: s.p ? id : nul
     const ids = tracks.slice(0, 50).map((x) => x[0]);
     const artists = [...L.artists.values()].filter((a) => hit(a.name)).sort((a, b) => (norm(b.name).startsWith(nq) - norm(a.name).startsWith(nq)) || b.plays - a.plays).slice(0, 12);
     const albums = [...L.albums.values()].filter((a) => hit(a.title + " " + a.artist)).sort((a, b) => (norm(b.title).startsWith(nq) - norm(a.title).startsWith(nq)) || b.plays - a.plays).slice(0, 12);
-    if (!ids.length && !artists.length && !albums.length) return html`<div class="empty"><div class="big-ic">${icon("search", "lg")}</div><h2>Aucun résultat pour « ${q} »</h2><p>Vérifie l'orthographe, ou essaie un bout du titre, de l'artiste ou de l'album.</p><button class="btn" data-act="nav" data-view="discover">${icon("sparkles", "sm")} Chercher de nouveaux artistes</button></div>`;
+    if (!ids.length && !artists.length && !albums.length && !HUMEURS.some((m) => words.some((w) => w.length > 2 && norm(m.name).startsWith(w))) && !/humeur|ambiance|mood/.test(nq)) return html`<div class="empty"><div class="big-ic">${icon("search", "lg")}</div><h2>Aucun résultat pour « ${q} »</h2><p>Vérifie l'orthographe, ou essaie un bout du titre, de l'artiste ou de l'album.</p><button class="btn" data-act="nav" data-view="discover">${icon("sparkles", "sm")} Chercher de nouveaux artistes</button></div>`;
+    const moodHits = HUMEURS.filter((m) => words.some((w) => w.length > 2 && (norm(m.name).startsWith(w) || norm(m.hint).includes(w))) || (nq.length > 2 && /humeur|ambiance|mood/.test(nq)));
     return html`<div class="view-head"><div><h1 class="h-page">Résultats</h1><div class="sub">pour « ${q} »</div></div></div>
+${moodHits.length ? html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Humeurs</h2></div><div class="moods">${moodHits.map((m) => moodCard(m, An.moods()[m.k].length))}</div></section>` : ""}
 ${artists.length ? shelf("Artistes", artists.map((a) => artistCard(a.key))) : ""}
 ${ids.length ? html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Titres</h2></div>${trackList(ids.slice(0, 20), { label: `Recherche « ${q} »`, ref: "search:" + q })}</section>` : ""}
 ${albums.length ? shelf("Albums", albums.map((a) => albumCard(a.key))) : ""}`;

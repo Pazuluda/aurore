@@ -167,6 +167,7 @@ const NP = CAP ? {
       CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
     } catch { /* ancienne version */ }
     document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); else this.exportLibrary(); });
+    Fx.apply();
     if (s.count > 0 && s.id && L.tracks.has(s.id)) { if (s.gen < 0 && (store.get("nwin", null) || {}).gen !== s.gen) this.takeOver(s); else this.adopt(s); }
   },
   /* Android Auto a lancé une liste : l'app la reprend telle quelle */
@@ -188,7 +189,7 @@ const NP = CAP ? {
     if (!this.ok) return;
     const media = (id) => !!L.files.get(id)?.media && L.tracks.has(id);
     const art = (k) => (k && L.art.get(k)?.big ? k : "");
-    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey)]; });
+    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey), Fx.trackGain(id)]; });
     if (!tracks.length) return;
     const albums = L.sorted.albums.map((k) => L.albums.get(k)).filter((a) => a && !a.demo).map((a) => [a.key, a.title, a.artist || "", art(a.artKey), a.tracks.filter(media)]).filter((a) => a[4].length);
     const artists = L.sorted.artists.map((k) => L.artists.get(k)).filter(Boolean).map((a) => { const ids = a.tracks.filter(media); return [a.key, a.name, plural(ids.length, "titre", "titres"), art(a.artKey), ids]; }).filter((a) => a[4].length);
@@ -211,7 +212,7 @@ const NP = CAP ? {
   },
   item(id) {
     const t = L.tracks.get(id), f = L.files.get(id);
-    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "" };
+    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "", gain: Fx.trackGain(id) };
   },
   playable(id) { return !!(L.files.get(id)?.media && L.tracks.has(id)); },
   /* titres envoyés au service : 5 précédents, celui qui joue, puis jusqu'à 150 à venir (file d'attente, puis la suite) */

@@ -42,20 +42,36 @@ const Player = {
           this.analyser.connect(this.mute); this.mute.connect(ctx.destination);
           this.src = ctx.createMediaElementSource(this.shadow); this.src.connect(this.analyser);
         } else {
-          this.fade.connect(this.vol); this.vol.connect(this.analyser); this.analyser.connect(ctx.destination);
+          /* égaliseur 6 bandes + volume égalisé, entre le fondu et le volume */
+          this.eqNodes = EQ_FREQS.map((f, i) => { const b = ctx.createBiquadFilter(); b.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking"; b.frequency.value = f; if (b.type === "peaking") b.Q.value = 1.1; b.gain.value = 0; return b; });
+          this.norm = ctx.createGain();
+          let n = this.fade; for (const b of this.eqNodes) { n.connect(b); n = b; } n.connect(this.norm);
+          this.norm.connect(this.vol); this.vol.connect(this.analyser); this.analyser.connect(ctx.destination);
           this.src = ctx.createMediaElementSource(this.audio); this.src.connect(this.fade);
         }
-        this.applyVolume();
+        this.applyVolume(); this.applyFx();
         Viz.attach(this.analyser, ctx.sampleRate);
       } catch (e) { console.warn("Web Audio indisponible", e); this.ctx = null; return null; }
     }
     if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     return this.ctx;
   },
+  /* égaliseur et volume égalisé du titre en cours */
+  normDb: 0,
+  applyFx(id = this.id) {
+    this.normDb = id ? Fx.trackGain(id) : 0;
+    if (this.mode === "native") { if (NP) NP.call("pfx", { track: this.normDb }).catch(() => {}); return; }
+    if (this.ctx && this.eqNodes) {
+      const t = this.ctx.currentTime;
+      this.eqNodes.forEach((b, i) => b.gain.setTargetAtTime(Fx.eqOn ? Fx.eq[i] : 0, t, .04));
+      this.norm.gain.setTargetAtTime(Math.pow(10, (this.normDb + Fx.preamp()) / 20), t, .08);
+    }
+    if (this.split) this.applyVolume();
+  },
   applyVolume() {
     if (this.mode === "native") return this.applyNativeVolume();
     const v = this.muted ? 0 : this.volume * this.volume;
-    if (this.split) { this.audio.volume = clamp(v, 0, 1); if (this.vol && this.ctx) this.vol.gain.value = v; return; }
+    if (this.split) { this.audio.volume = clamp(v * Math.min(1, Math.pow(10, this.normDb / 20)), 0, 1); if (this.vol && this.ctx) this.vol.gain.value = v; return; }
     if (this.vol && this.ctx) this.vol.gain.setTargetAtTime(v, this.ctx.currentTime, .015);
     else if (this.audio) this.audio.volume = clamp(v, 0, 1);
   },
@@ -95,6 +111,7 @@ const Player = {
     if (this.url && this.url.startsWith("blob:")) URL.revokeObjectURL(this.url);
     this.url = src;
     this.id = id; this.loading = true; this.triedBuffer = false;
+    this.applyFx(id);
     this.emit("track", id);
     if (this.preferBuffer) return this.loadBuffer(id, token, autoplay, startAt);
     this.mode = "element";
@@ -114,6 +131,7 @@ const Player = {
     this.stopBuffer(); this.buf = null;
     this.enterNative();
     this.id = id; this.loading = false; this.triedBuffer = false;
+    this.normDb = Fx.trackGain(id);
     this.emit("track", id);
     if (!autoplay) { NP.cue(startAt); this.playing = false; this.emit("state"); return true; }
     this.playing = true; this.emit("state");

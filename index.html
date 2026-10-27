@@ -522,7 +522,7 @@ input[type="range"]:focus-visible { outline: none; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(6px); } }
 .sheet { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; background: rgb(var(--pane-rgb) / .6); padding: 16px; }
-.sheet-card { width: min(560px, 100%); max-height: calc(100% - 32px); overflow-y: auto; border-radius: 20px; background: var(--ink-1); border: 1px solid var(--line-2); padding: 22px; animation: pop 200ms var(--ease-out); }
+.sheet-card { width: min(560px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: 20px; background: var(--ink-1); border: 1px solid var(--line-2); padding: 22px; animation: pop 200ms var(--ease-out); }
 .sheet-card h2 { font: 700 22px/1.2 var(--f-display); letter-spacing: -.02em; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); }
 .set-row:first-of-type { border-top: 0; }
@@ -822,6 +822,45 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 @media (prefers-reduced-motion: reduce) { .g-stage, .g-stage .hit::after, .g-count { animation: none !important; } }
 .calm .g-stage .hit::after, .calm .g-count { animation: none; }
 
+/* ---------- humeurs ---------- */
+.moods { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.mood { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 108px; padding: 14px; border-radius: 18px; text-align: left; color: #fff; overflow: hidden; background: linear-gradient(135deg, var(--m1), var(--m2)); box-shadow: 0 14px 30px -18px var(--m1); transition: transform var(--t-fast), box-shadow var(--t-med); }
+.mood::after { content: ""; position: absolute; inset: auto -30% -60% auto; width: 140px; height: 140px; border-radius: 50%; background: rgb(255 255 255 / .16); }
+.mood:hover { transform: translateY(-2px); box-shadow: 0 18px 36px -16px var(--m1); }
+.mood:active { transform: scale(.98); }
+.mood-ic { width: 34px; height: 34px; border-radius: 12px; display: grid; place-items: center; background: rgb(0 0 0 / .18); margin-bottom: auto; }
+.mood b { font: 800 17px/1.1 var(--f-display); letter-spacing: -.02em; }
+.mood small { font-size: 12.5px; opacity: .88; }
+.mood .mini-play { position: absolute; right: 12px; bottom: 12px; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #111; opacity: 0; transform: translateY(6px); transition: opacity var(--t-fast), transform var(--t-fast); z-index: 1; }
+.mood:hover .mini-play, .mood:focus-visible .mini-play { opacity: 1; transform: none; }
+.mood-prog { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 13px; color: var(--text-2); }
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c2); box-shadow: 0 0 0 0 var(--c2); animation: pdot 1.6s ease-out infinite; }
+@keyframes pdot { 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (max-width: 760px) { .moods { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } .mood { min-height: 96px; } .mood .mini-play { display: none; } }
+.calm .pulse-dot { animation: none; }
+
+/* ---------- égaliseur ---------- */
+.eqz { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; transition: opacity var(--t-med); }
+.eqz.off .eq-bands, .eqz.off .eq-graph { opacity: .45; }
+.eq-presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.eq-presets button { min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-2); font-size: 13px; font-weight: 600; color: var(--text-2); }
+.eq-presets button[aria-checked="true"] { background: var(--c1); border-color: var(--c1); color: var(--on-c1); }
+.eq-graph { border-radius: 14px; background: rgb(var(--hl) / .04); border: 1px solid var(--line); padding: 6px; }
+.eq-curve { display: block; width: 100%; height: 90px; }
+.eq-zero { stroke: var(--line-2); stroke-dasharray: 3 4; }
+.eq-line { fill: none; stroke: var(--c1); stroke-width: 2.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.eq-fill { fill: color-mix(in srgb, var(--c1) 14%, transparent); stroke: none; }
+.eq-bands { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); }
+.eq-val { font-size: 12px; color: var(--text); min-height: 16px; }
+.eq-band input[type="range"] { writing-mode: vertical-lr; direction: rtl; width: 32px; height: 150px; flex: none; margin: 0; cursor: pointer; }
+.eq-band input[type="range"]::-webkit-slider-runnable-track { width: 6px; height: 100%; margin: 0 auto; border-radius: 6px; background: linear-gradient(0deg, var(--c1) var(--p), rgb(var(--hl) / .14) var(--p)); }
+.eq-band input[type="range"]::-moz-range-track { width: 6px; border-radius: 6px; background: linear-gradient(0deg, var(--c1) var(--p), rgb(var(--hl) / .14) var(--p)); }
+.eq-band input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin: 0 0 0 -8px; opacity: 1; background: var(--text); box-shadow: 0 2px 8px rgb(0 0 0 / .35), 0 0 0 3px color-mix(in srgb, var(--c1) 45%, transparent); }
+.eq-band input[type="range"]::-moz-range-thumb { width: 22px; height: 22px; opacity: 1; }
+.eq-band input[type="range"]:hover::-webkit-slider-runnable-track { background: linear-gradient(0deg, var(--c1) var(--p), rgb(var(--hl) / .2) var(--p)); }
+.eq-note { margin: 0; font-size: 12.5px; color: var(--text-3); }
+
 </style>
 </head>
 <body>
@@ -966,6 +1005,12 @@ const isPhone = () => matchMedia("(max-width: 760px)").matches;
 
 /* ===================== icônes (tracés style Lucide) ===================== */
 const ICONS = {
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  eq: '<path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/>',
   info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><circle cx="17" cy="6" r="2"/>',
   burst: '<path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.9 4.9 2.8 2.8"/><path d="m16.3 16.3 2.8 2.8"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.9 19.1 2.8-2.8"/><path d="m16.3 7.7 2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
@@ -1684,6 +1729,7 @@ const NP = CAP ? {
       CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
     } catch { /* ancienne version */ }
     document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); else this.exportLibrary(); });
+    Fx.apply();
     if (s.count > 0 && s.id && L.tracks.has(s.id)) { if (s.gen < 0 && (store.get("nwin", null) || {}).gen !== s.gen) this.takeOver(s); else this.adopt(s); }
   },
   /* Android Auto a lancé une liste : l'app la reprend telle quelle */
@@ -1705,7 +1751,7 @@ const NP = CAP ? {
     if (!this.ok) return;
     const media = (id) => !!L.files.get(id)?.media && L.tracks.has(id);
     const art = (k) => (k && L.art.get(k)?.big ? k : "");
-    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey)]; });
+    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey), Fx.trackGain(id)]; });
     if (!tracks.length) return;
     const albums = L.sorted.albums.map((k) => L.albums.get(k)).filter((a) => a && !a.demo).map((a) => [a.key, a.title, a.artist || "", art(a.artKey), a.tracks.filter(media)]).filter((a) => a[4].length);
     const artists = L.sorted.artists.map((k) => L.artists.get(k)).filter(Boolean).map((a) => { const ids = a.tracks.filter(media); return [a.key, a.name, plural(ids.length, "titre", "titres"), art(a.artKey), ids]; }).filter((a) => a[4].length);
@@ -1728,7 +1774,7 @@ const NP = CAP ? {
   },
   item(id) {
     const t = L.tracks.get(id), f = L.files.get(id);
-    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "" };
+    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "", gain: Fx.trackGain(id) };
   },
   playable(id) { return !!(L.files.get(id)?.media && L.tracks.has(id)); },
   /* titres envoyés au service : 5 précédents, celui qui joue, puis jusqu'à 150 à venir (file d'attente, puis la suite) */
@@ -2270,7 +2316,7 @@ async function importEntries(entries, opts = {}) {
   const added = todo.length;
   L.importing = null;
   UI.onLibraryProgress();
-  UI.onLibraryChanged();
+  UI.onLibraryChanged(); setTimeout(() => An.start(), 1500);
   if (added && attached) toast(`${plural(added, "nouveau titre", "nouveaux titres")}, ${plural(attached, "titre retrouvé", "titres retrouvés")}.`);
   else if (added) toast(`${plural(added, "titre ajouté", "titres ajoutés")} à ta bibliothèque.`);
   else if (!opts.quiet) toast(`Ta musique est prête : ${plural(attached, "titre", "titres")}.`);
@@ -2406,6 +2452,180 @@ async function reopenFolder() {
   return openFolder();
 }
 
+/* ===================== écoute des titres : volume, énergie, tempo, brillance → humeurs ===================== */
+/* Chaque titre est décodé une fois, en arrière-plan et en basse définition (11 kHz, mono).
+   On en tire : le volume moyen (pour égaliser le volume), le pic, le tempo et la netteté du rythme,
+   l'énergie, la brillance et les variations. Rien ne sort de l'appareil. */
+const AN_VERSION = 1;
+const HUMEURS = [
+  { k: "calme", name: "Calme", ic: "moon", c: ["#6d7dff", "#8fd3ff"], hint: "Doux, lent, posé" },
+  { k: "energique", name: "Énergique", ic: "bolt", c: ["#ff5c6c", "#ffb547"], hint: "Fort, rapide, ça pousse" },
+  { k: "dansant", name: "Dansant", ic: "disc", c: ["#ff4fbf", "#8b5cff"], hint: "Un rythme net qui fait bouger" },
+  { k: "lumineux", name: "Lumineux", ic: "sun", c: ["#ffd84d", "#4fe3b5"], hint: "Clair, brillant, solaire" },
+  { k: "sombre", name: "Sombre", ic: "cloud", c: ["#4b3f8f", "#1f8a9a"], hint: "Grave, feutré, nocturne" },
+  { k: "focus", name: "Concentration", ic: "target", c: ["#3fe0c5", "#5b8cff"], hint: "Régulier, pour bosser" },
+];
+
+const An = {
+  queue: [], busy: false, done: 0, total: 0, paused: false, cache: null,
+  todo() { return [...L.tracks.values()].filter((t) => !t.demo && L.files.has(t.id) && (!t.an || t.an.v !== AN_VERSION) && !(t.anFail >= 2)).map((t) => t.id); },
+  start() {
+    if (this.busy) return;
+    this.queue = this.todo(); this.total = this.queue.length + this.countDone(); this.done = this.countDone();
+    if (!this.queue.length) return;
+    this.busy = true; this.loop();
+  },
+  countDone() { let n = 0; for (const t of L.tracks.values()) if (t.an && t.an.v === AN_VERSION) n++; return n; },
+  async loop() {
+    while (this.queue.length) {
+      if (document.hidden || L.importing || this.paused) { await sleep(3000); continue; }
+      const id = this.queue.shift(); const t = L.tracks.get(id); if (!t || !L.files.has(id)) continue;
+      try {
+        t.an = await this.analyze(L.files.get(id));
+        delete t.anFail;
+      } catch { t.anFail = (t.anFail || 0) + 1; }
+      DB.put("tracks", t.id, t).catch(() => {});
+      this.done = this.countDone(); this.cache = null;
+      if (Player.id === id) Fx.applyTrack(id);
+      if (this.done % 10 === 0 || !this.queue.length) { UI.onAnalysis && UI.onAnalysis(); if (NP && NP.ok) NP.exportSoon(); }
+      await sleep(IS_MOBILE ? 600 : 150);
+    }
+    const more = this.todo(); this.busy = false;
+    if (more.length) return this.start();
+    UI.onAnalysis && UI.onAnalysis();
+  },
+  async analyze(f) {
+    if (f.size > 120e6) throw new Error("trop gros");
+    const ab = await (await asBlob(f)).arrayBuffer();
+    const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new AC(1, 1, 11025);
+    const buf = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+    const n = buf.length, ch = buf.numberOfChannels, sr = buf.sampleRate;
+    const x = new Float32Array(n);
+    for (let c = 0; c < ch; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) x[i] += d[i] / ch; }
+    return this.features(x, sr);
+  },
+  features(x, sr) {
+    const N = 512, H = 256, frames = Math.max(1, Math.floor((x.length - N) / H));
+    const e = new Float32Array(frames); let peak = 0, zc = 0, zn = 0;
+    for (let f = 0; f < frames; f++) {
+      let s = 0; const o = f * H;
+      for (let i = 0; i < N; i++) { const v = x[o + i]; s += v * v; }
+      e[f] = s / N;
+    }
+    for (let i = 1; i < x.length; i += 2) { const v = Math.abs(x[i]); if (v > peak) peak = v; if ((x[i] >= 0) !== (x[i - 1] >= 0)) zc++; zn++; }
+    /* volume : moyenne d'énergie des passages audibles (porte à -10 dB sous la moyenne) */
+    let mean = 0; for (const v of e) mean += v; mean /= frames;
+    const gate = mean * .1; let g = 0, gn = 0; for (const v of e) if (v > gate && v > 1e-7) { g += v; gn++; }
+    const loud = 10 * Math.log10((gn ? g / gn : mean) + 1e-12);
+    /* variations : écart type du niveau (en dB) */
+    let m2 = 0, m1 = 0, k = 0; for (const v of e) if (v > gate && v > 1e-7) { const d = 10 * Math.log10(v); m1 += d; m2 += d * d; k++; }
+    const dyn = k ? Math.sqrt(Math.max(0, m2 / k - (m1 / k) ** 2)) : 0;
+    /* attaques : hausse du niveau d'une trame à l'autre */
+    const on = new Float32Array(frames); let onSum = 0;
+    for (let f = 1; f < frames; f++) { const d = Math.log10(e[f] + 1e-9) - Math.log10(e[f - 1] + 1e-9); on[f] = d > 0 ? d : 0; onSum += on[f]; }
+    const onMean = onSum / frames; for (let f = 0; f < frames; f++) on[f] -= onMean;
+    /* tempo : autocorrélation des attaques entre 60 et 180 BPM */
+    const fps = sr / H; let best = 0, bestLag = 0, zero = 0;
+    for (let f = 0; f < frames; f++) zero += on[f] * on[f];
+    const lo = Math.floor(fps * 60 / 180), hi = Math.ceil(fps * 60 / 60);
+    const ac = new Float32Array(hi + 2);
+    for (let lag = lo; lag <= hi; lag++) { let s = 0; for (let f = lag; f < frames; f++) s += on[f] * on[f - lag]; ac[lag] = s; }
+    for (let lag = lo; lag <= hi; lag++) { const bpm = 60 * fps / lag; const w = Math.exp(-((Math.log2(bpm / 115)) ** 2) / 1.2); const v = ac[lag] * w; if (v > best) { best = v; bestLag = lag; } }
+    let bpm = bestLag ? 60 * fps / bestLag : 0;
+    if (bestLag > lo && bestLag < hi) { const a = ac[bestLag - 1], b = ac[bestLag], c = ac[bestLag + 1], d = a - 2 * b + c; if (d) bpm = 60 * fps / (bestLag + .5 * (a - c) / d); }
+    const pulse = zero > 0 ? clamp(ac[bestLag] / zero, 0, 1) : 0;
+    const bright = zn ? zc / zn : 0;
+    const r = (v, d = 2) => +v.toFixed(d);
+    return { v: AN_VERSION, loud: r(loud, 1), peak: r(20 * Math.log10(peak + 1e-9), 1), bpm: r(bpm, 0), pulse: r(pulse, 3), bright: r(bright, 4), dyn: r(dyn, 2), onset: r(onMean * 100, 3) };
+  },
+  /* humeurs : chaque titre est comparé au reste de ta bibliothèque */
+  moods() {
+    if (this.cache) return this.cache;
+    const ts = [...L.tracks.values()].filter((t) => t.an && t.an.v === AN_VERSION);
+    const out = Object.fromEntries(HUMEURS.map((m) => [m.k, []]));
+    if (ts.length < 3) return (this.cache = out);
+    const rank = (key) => { const s = ts.map((t) => t.an[key]).sort((a, b) => a - b); return (v) => { let lo = 0, hi = s.length; while (lo < hi) { const m = (lo + hi) >> 1; if (s[m] < v) lo = m + 1; else hi = m; } return lo / Math.max(1, s.length - 1); }; };
+    const rL = rank("loud"), rO = rank("onset"), rB = rank("bright"), rP = rank("pulse"), rD = rank("dyn");
+    for (const t of ts) {
+      const a = t.an, E = (rL(a.loud) + rO(a.onset) * 1.4) / 2.4, B = rB(a.bright), P = rP(a.pulse), D = rD(a.dyn), g = (t.genre || "").toLowerCase();
+      const soft = /class|ambient|piano|chill|lo-?fi|jazz|acoust|folk|ballad|new age|soundtrack|bande/.test(g), hard = /metal|rock|punk|edm|dubstep|drum|trap|hardstyle|techno|rap/.test(g), dance = /dance|house|disco|funk|electro|pop|reggaeton|afro|club/.test(g);
+      const sc = {
+        calme: (1 - E) * 1.2 + (soft ? .35 : 0) - (hard ? .4 : 0) + (a.bpm < 95 ? .15 : 0),
+        energique: E * 1.2 + (hard ? .35 : 0) - (soft ? .3 : 0) + (a.bpm > 125 ? .1 : 0),
+        dansant: P * .8 + E * .4 + (a.bpm >= 95 && a.bpm <= 135 ? .25 : -.2) + (dance ? .35 : 0),
+        lumineux: B * 1.1 + (E > .25 && E < .9 ? .2 : 0) - (D > .8 ? .1 : 0),
+        sombre: (1 - B) * 1.1 + (E < .6 ? .2 : -.2),
+        focus: (1 - D) * .7 + (E > .15 && E < .6 ? .45 : -.2) + (soft ? .2 : 0) - (P > .85 ? .1 : 0),
+      };
+      for (const m of HUMEURS) if (sc[m.k] > 1) out[m.k].push([t.id, sc[m.k]]);
+    }
+    for (const k in out) out[k] = out[k].sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+    return (this.cache = out);
+  },
+  moodOf(k) { return HUMEURS.find((m) => m.k === k); },
+};
+
+/* ===================== égaliseur et volume égalisé ===================== */
+const EQ_FREQS = [60, 170, 600, 1500, 4000, 11000];
+const EQ_PRESETS = [
+  ["plat", "Plat", [0, 0, 0, 0, 0, 0]],
+  ["basses", "Basses +", [6, 4, 0, 0, 0, 0]],
+  ["soiree", "Soirée", [5, 3, -1, 0, 2, 4]],
+  ["voix", "Voix", [-2, -1, 2, 4, 3, 0]],
+  ["acoustique", "Acoustique", [2, 1, 1, 2, 2, 3]],
+  ["electro", "Électro", [5, 3, 0, -1, 2, 4]],
+  ["nuit", "Nuit (doux)", [2, 1, 0, -1, -3, -5]],
+  ["aigus", "Aigus +", [0, 0, 0, 1, 4, 6]],
+];
+const Fx = {
+  eq: store.get("eq", [0, 0, 0, 0, 0, 0]), eqOn: store.get("eqOn", false), preset: store.get("eqPreset", "plat"), norm: store.get("norm", true),
+  /* gain d'un titre pour l'amener au même volume que les autres (cible -18 dB, sans saturer) */
+  trackGain(id) {
+    const a = L.tracks.get(id)?.an; if (!this.norm || !a || a.v !== AN_VERSION) return 0;
+    let g = -18 - a.loud; g = Math.min(g, -a.peak - .5 + 3); return clamp(+g.toFixed(1), -12, 6);
+  },
+  /* l'égaliseur gonfle certaines fréquences : on baisse un peu le tout pour ne pas saturer */
+  preamp() { return this.eqOn ? -Math.max(0, ...this.eq) * .6 : 0; },
+  set(eq, preset) { this.eq = eq.map((v) => clamp(Math.round(v * 2) / 2, -12, 12)); if (preset) this.preset = preset; store.set("eq", this.eq); store.set("eqPreset", this.preset); this.apply(); },
+  setOn(on) { this.eqOn = on; store.set("eqOn", on); this.apply(); },
+  setNorm(on) { this.norm = on; store.set("norm", on); this.apply(); if (Player.id) this.applyTrack(Player.id); },
+  apply() {
+    Player.applyFx();
+    if (NP && NP.ok) NP.call("pfx", { eq: this.eq, eqOn: this.eqOn, preamp: this.preamp(), norm: this.norm }).catch(() => {});
+  },
+  applyTrack(id) { Player.applyFx(id); },
+  /* courbe de réponse (pour le dessin), en dB, aux fréquences demandées */
+  response(freqs, sr = 48000) {
+    const out = new Float32Array(freqs.length);
+    if (!this.eqOn) return out;
+    EQ_FREQS.forEach((f0, b) => {
+      const c = biquad(b, f0, this.eq[b], sr); if (!c) return;
+      freqs.forEach((f, i) => {
+        const w = 2 * Math.PI * f / sr, cos1 = Math.cos(w), sin1 = Math.sin(w), cos2 = Math.cos(2 * w), sin2 = Math.sin(2 * w);
+        const nr = c[0] + c[1] * cos1 + c[2] * cos2, ni = -(c[1] * sin1 + c[2] * sin2), dr = 1 + c[3] * cos1 + c[4] * cos2, di = -(c[3] * sin1 + c[4] * sin2);
+        out[i] += 10 * Math.log10((nr * nr + ni * ni) / (dr * dr + di * di));
+      });
+    });
+    return out;
+  },
+};
+/* même formule que le lecteur Android (RBJ) : étagères aux bouts, cloches au milieu */
+function biquad(b, f0, db, sr) {
+  if (!db || f0 >= sr * .45) return null;
+  const A = Math.pow(10, db / 40), w = 2 * Math.PI * f0 / sr, cs = Math.cos(w), sn = Math.sin(w);
+  let b0, b1, b2, a0, a1, a2;
+  if (b === 0 || b === EQ_FREQS.length - 1) {
+    const S = 1, al = sn / 2 * Math.sqrt((A + 1 / A) * (1 / S - 1) + 2), sq = 2 * Math.sqrt(A) * al;
+    if (b === 0) { b0 = A * ((A + 1) - (A - 1) * cs + sq); b1 = 2 * A * ((A - 1) - (A + 1) * cs); b2 = A * ((A + 1) - (A - 1) * cs - sq); a0 = (A + 1) + (A - 1) * cs + sq; a1 = -2 * ((A - 1) + (A + 1) * cs); a2 = (A + 1) + (A - 1) * cs - sq; }
+    else { b0 = A * ((A + 1) + (A - 1) * cs + sq); b1 = -2 * A * ((A - 1) + (A + 1) * cs); b2 = A * ((A + 1) + (A - 1) * cs - sq); a0 = (A + 1) - (A - 1) * cs + sq; a1 = 2 * ((A - 1) - (A + 1) * cs); a2 = (A + 1) - (A - 1) * cs - sq; }
+  } else {
+    const Q = 1.1, al = sn / (2 * Q);
+    b0 = 1 + al * A; b1 = -2 * cs; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cs; a2 = 1 - al / A;
+  }
+  return [b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0];
+}
+
 /* ===================== moteur audio ===================== */
 const Player = {
   audio: null, ctx: null, src: null, fade: null, vol: null, analyser: null,
@@ -2450,20 +2670,36 @@ const Player = {
           this.analyser.connect(this.mute); this.mute.connect(ctx.destination);
           this.src = ctx.createMediaElementSource(this.shadow); this.src.connect(this.analyser);
         } else {
-          this.fade.connect(this.vol); this.vol.connect(this.analyser); this.analyser.connect(ctx.destination);
+          /* égaliseur 6 bandes + volume égalisé, entre le fondu et le volume */
+          this.eqNodes = EQ_FREQS.map((f, i) => { const b = ctx.createBiquadFilter(); b.type = i === 0 ? "lowshelf" : i === EQ_FREQS.length - 1 ? "highshelf" : "peaking"; b.frequency.value = f; if (b.type === "peaking") b.Q.value = 1.1; b.gain.value = 0; return b; });
+          this.norm = ctx.createGain();
+          let n = this.fade; for (const b of this.eqNodes) { n.connect(b); n = b; } n.connect(this.norm);
+          this.norm.connect(this.vol); this.vol.connect(this.analyser); this.analyser.connect(ctx.destination);
           this.src = ctx.createMediaElementSource(this.audio); this.src.connect(this.fade);
         }
-        this.applyVolume();
+        this.applyVolume(); this.applyFx();
         Viz.attach(this.analyser, ctx.sampleRate);
       } catch (e) { console.warn("Web Audio indisponible", e); this.ctx = null; return null; }
     }
     if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
     return this.ctx;
   },
+  /* égaliseur et volume égalisé du titre en cours */
+  normDb: 0,
+  applyFx(id = this.id) {
+    this.normDb = id ? Fx.trackGain(id) : 0;
+    if (this.mode === "native") { if (NP) NP.call("pfx", { track: this.normDb }).catch(() => {}); return; }
+    if (this.ctx && this.eqNodes) {
+      const t = this.ctx.currentTime;
+      this.eqNodes.forEach((b, i) => b.gain.setTargetAtTime(Fx.eqOn ? Fx.eq[i] : 0, t, .04));
+      this.norm.gain.setTargetAtTime(Math.pow(10, (this.normDb + Fx.preamp()) / 20), t, .08);
+    }
+    if (this.split) this.applyVolume();
+  },
   applyVolume() {
     if (this.mode === "native") return this.applyNativeVolume();
     const v = this.muted ? 0 : this.volume * this.volume;
-    if (this.split) { this.audio.volume = clamp(v, 0, 1); if (this.vol && this.ctx) this.vol.gain.value = v; return; }
+    if (this.split) { this.audio.volume = clamp(v * Math.min(1, Math.pow(10, this.normDb / 20)), 0, 1); if (this.vol && this.ctx) this.vol.gain.value = v; return; }
     if (this.vol && this.ctx) this.vol.gain.setTargetAtTime(v, this.ctx.currentTime, .015);
     else if (this.audio) this.audio.volume = clamp(v, 0, 1);
   },
@@ -2503,6 +2739,7 @@ const Player = {
     if (this.url && this.url.startsWith("blob:")) URL.revokeObjectURL(this.url);
     this.url = src;
     this.id = id; this.loading = true; this.triedBuffer = false;
+    this.applyFx(id);
     this.emit("track", id);
     if (this.preferBuffer) return this.loadBuffer(id, token, autoplay, startAt);
     this.mode = "element";
@@ -2522,6 +2759,7 @@ const Player = {
     this.stopBuffer(); this.buf = null;
     this.enterNative();
     this.id = id; this.loading = false; this.triedBuffer = false;
+    this.normDb = Fx.trackGain(id);
     this.emit("track", id);
     if (!autoplay) { NP.cue(startAt); this.playing = false; this.emit("state"); return true; }
     this.playing = true; this.emit("state");
@@ -3301,7 +3539,7 @@ function rowHTML(id, i, opts) {
 <div class="c-title">${opts.cover ? thumbHTML(t.artKey) : ""}<div><div class="t-name" title="${t.title}">${t.title}</div><div class="t-artist">${artistLinks(t)}</div></div></div>
 ${opts.album ? html`<div class="c-album">${t.albumKey ? html`<button data-act="open-album" data-key="${t.albumKey}">${t.album}</button>` : ""}</div>` : ""}
 <div class="c-plays">${playsOf(id) || ""}</div>
-<div class="c-like"><button class="icon-btn heart${liked ? " on" : ""}" data-act="like" aria-pressed="${liked}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart", "sm")}</button></div>
+<div class="c-like"><button class="icon-btn heart${liked ? " on" : ""}" data-act="like" aria-pressed="${String(liked)}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart", "sm")}</button></div>
 <div class="c-dur">${t.duration ? fmtTime(t.duration) : "–"}</div>
 <div class="c-more"><button class="icon-btn" data-act="row-menu" aria-label="Plus d'options pour ${t.title}">${icon("more", "sm")}</button></div>
 </div>`;
@@ -3476,6 +3714,9 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     } else body = html`<span>Ta bibliothèque est vide.</span>`;
     setHTML(el, body);
   },
+  onAnalysis() {
+    if (this._anT) return; this._anT = setTimeout(() => { this._anT = null; if (this.view.name === "home" && !this.imm) this.rerender(); const s = $("#an-status"); if (s) s.textContent = anStatus(); }, 1500);
+  },
   onLibraryChanged() { this.renderNav(); this.onLibraryProgress(); if (["home", "tracks", "albums", "artists", "album", "artist", "list", "search", "discover"].includes(this.view.name)) this.rerender(); },
   onStatsChanged() { if (this.view.name === "home" && !this.imm) this.rerender(); },
   onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); if (NP && Player.mode === "native") NP.refreshSoon(); },
@@ -3634,7 +3875,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     setHTML(np, html`<div class="np-head"><span class="np-ctx" title="${Q.label}">${Q.label || "En cours"}</span><button class="icon-btn" data-act="toggle-np" aria-label="Fermer le panneau">${icon("x", "sm")}</button></div>
 <div class="np-body">
   <div class="np-cover">${artBig(t.artKey) ? html`<img src="${artBig(t.artKey)}" alt="Pochette de ${t.album || t.title}">` : html`<div class="ph">${icon("music", "lg")}</div>`}<button class="icon-btn" data-act="immersive" aria-label="Mode immersif">${icon("expand", "sm")}</button></div>
-  <div class="np-titles"><div><div class="np-title">${t.title}</div><div class="np-artist">${artistLinks(t)}</div></div><button class="icon-btn heart js-like${liked ? " on" : ""}" data-act="like-current" aria-pressed="${liked}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart")}</button></div>
+  <div class="np-titles"><div><div class="np-title">${t.title}</div><div class="np-artist">${artistLinks(t)}</div></div><button class="icon-btn heart js-like${liked ? " on" : ""}" data-act="like-current" aria-pressed="${String(liked)}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart")}</button></div>
   <div class="viz-box"><canvas id="np-viz" aria-hidden="true"></canvas><div class="viz-cap"><span>32 Hz</span><span>${info}</span><span>16 kHz</span></div></div>
   ${this.queueHTML(up)}
 </div>`);
@@ -3679,9 +3920,9 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
     setHTML(el, html`<div class="imm-bg" style="${big ? `background-image:url('${big}')` : ""}"></div><canvas aria-hidden="true"></canvas>
 <div class="imm-top"><button class="icon-btn" data-act="close-imm" aria-label="Fermer le mode immersif" title="Fermer (Échap)">${icon("down")}</button>
 <div class="ctx"><small>Lecture depuis</small><span>${Q.label || "ta bibliothèque"}</span></div>
-<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${Viz.mode === k}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
+<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${String(Viz.mode === k)}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
 <button class="viz-pick" data-act="viz-menu" aria-label="Changer de visualiseur">${icon((modes.find((m) => m[0] === Viz.mode) || modes[0])[2], "sm")}<span>${(modes.find((m) => m[0] === Viz.mode) || modes[0])[1]}</span></button>
-<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${this.immQueue}">${icon("queue", "sm")}</button></div>
+<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${String(this.immQueue)}">${icon("queue", "sm")}</button></div>
 <div></div>
 <div class="imm-bottom">
   <div class="imm-meta"><div class="d-cover">${t && artSmall(t.artKey) ? html`<img src="${artSmall(t.artKey)}" alt="">` : icon("music")}</div><div><div class="imm-title">${t ? t.title : "Rien en lecture"}</div><div class="imm-artist">${t ? html`${t.artist}${t.album ? " · " + t.album : ""}` : "Lance un titre depuis ta bibliothèque"}</div></div><button class="icon-btn heart js-like" data-act="like-current" aria-label="Ajouter aux titres likés">${icon("heart")}</button></div>
@@ -3859,8 +4100,19 @@ function artistTrackIds(key) {
   const T = (id) => L.tracks.get(id);
   return ar.tracks.slice().sort((a, b) => playsOf(b) - playsOf(a) || (T(b).year || 0) - (T(a).year || 0) || cmp(T(a).album, T(b).album) || (T(a).disc - T(b).disc) || (T(a).track - T(b).track));
 }
+function moodCard(m, n) {
+  return html`<button class="mood" data-act="open-list" data-id="mood:${m.k}" style="--m1:${m.c[0]};--m2:${m.c[1]}" aria-label="${m.name}, ${plural(n, "titre", "titres")}"><span class="mood-ic">${icon(m.ic)}</span><b>${m.name}</b><small>${n ? plural(n, "titre", "titres") : m.hint}</small><span class="mini-play" data-act="play-ctx" data-ctx="list:mood:${m.k}" aria-hidden="true">${icon("play")}</span></button>`;
+}
+function moodsHTML(compact) {
+  const mo = An.moods(), any = HUMEURS.some((m) => mo[m.k].length);
+  const left = An.total - An.done;
+  const prog = left > 0 ? html`<p class="mood-prog"><span class="pulse-dot"></span>J'écoute ta musique pour la ranger par humeur : ${An.done} / ${An.total}</p>` : "";
+  if (!any && !left) return "";
+  return html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Selon ton humeur</h2></div>${prog}${any ? html`<div class="moods${compact ? " compact" : ""}">${HUMEURS.map((m) => moodCard(m, mo[m.k].length))}</div>` : ""}</section>`;
+}
 function listSpec(id) {
   const hasT = (x) => L.tracks.has(x);
+  if (id.startsWith("mood:")) { const m = An.moodOf(id.slice(5)); if (!m) return null; return { name: m.name, kind: "Humeur", ids: (An.moods()[m.k] || []).filter(hasT), auto: true, ic: m.ic, mood: m, empty: An.total > An.done ? `aurore écoute encore ta musique (${An.done} / ${An.total}) : reviens dans un moment.` : "Aucun titre ne correspond vraiment à cette humeur pour l'instant." }; }
   if (id === "liked") return { name: "Titres likés", kind: "Playlist", ids: [...L.likes].reverse().filter(hasT), auto: true, ic: "heart", empty: "Touche le cœur à côté d'un titre pour le retrouver ici." };
   if (id === "top") return { name: "Les plus écoutés", kind: "Playlist auto", ids: topTracks(50), auto: true, ic: "bars", empty: "Écoute un peu de musique : tes 50 titres préférés apparaîtront ici, classés par nombre d'écoutes." };
   if (id === "never") return { name: "Jamais écoutés", kind: "Playlist auto", ids: L.sorted.tracks.filter((x) => !playsOf(x)).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)), auto: true, ic: "sparkles", empty: "Tu as tout écouté. Respect." };
@@ -3909,6 +4161,7 @@ const VIEWS = {
     return html`${installCard()}<div class="view-head"><div><h1 class="h-page">${greet}</h1><div class="sub">${plural(L.tracks.size, "titre", "titres")} · ${plural(L.albums.size, "album", "albums")} · ${plural(L.artists.size, "artiste", "artistes")} · ${fmtLong(dur)} de musique</div></div></div>
 <div class="tiles n${nT}">${tiles.slice(0, nT).map((t) => html`<button class="tile" style="--tc:${t.tc}" data-act="${t.act}" ${raw(t.id ? `data-id="${esc(t.id)}"` : "")} ${raw(t.key ? `data-key="${esc(t.key)}"` : "")} ${raw(t.act === "play-ctx" ? `data-ctx="${esc(t.ctx)}"` : "")}><span class="tile-art">${t.art && artSmall(t.art) ? html`<img src="${artSmall(t.art)}" alt="">` : icon(t.ic || "disc")}</span><span class="tile-name">${t.name}</span><span class="mini-play" data-act="play-ctx" data-ctx="${t.ctx}" aria-hidden="true">${icon("play")}</span></button>`)}</div>
 ${shelf("Écouté récemment", recents.map(albumCard))}
+${moodsHTML()}
 ${shelf("Tes playlists", L.playlists.map(playlistCard))}
 ${shelf(tops.length >= 3 ? "Tes artistes du moment" : "Tes artistes", artistKeys.map(artistCard), ["artists", "Tout afficher"])}
 ${shelf("Ajoutés récemment", added.map(albumCard), ["albums", "Tout afficher"])}
@@ -3934,8 +4187,8 @@ ${trackList(ids, { sort: UI.trackSort, label: "Tous les titres", ref: "tracks" }
     list.sort(s === "title" ? (a, b) => cmp(sortKey(a.title), sortKey(b.title)) : s === "recent" ? (a, b) => b.addedAt - a.addedAt : s === "year" ? (a, b) => (b.year || 0) - (a.year || 0) || cmp(a.title, b.title) : s === "plays" ? (a, b) => b.plays - a.plays || cmp(a.title, b.title) : (a, b) => cmp(sortKey(a.artist), sortKey(b.artist)) || (a.year - b.year) || cmp(a.title, b.title));
     const genres = L.genres.slice(0, 10);
     return html`<div class="view-head"><div><h1 class="h-page">Albums</h1><div class="sub">${plural(list.length, "album", "albums")}${UI.albumGenre ? " · " + UI.albumGenre : ""}</div></div></div>
-<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${sorts.map(([k, l]) => html`<button class="chip" data-act="album-sort" data-key="${k}" aria-pressed="${s === k}">${l}</button>`)}</div>
-${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="group" aria-label="Filtrer par genre"><button class="chip" data-act="album-genre" data-key="" aria-pressed="${!UI.albumGenre}">Tous les genres</button>${genres.map((g) => html`<button class="chip" data-act="album-genre" data-key="${g.name}" aria-pressed="${UI.albumGenre === g.name}">${g.name}</button>`)}</div>` : ""}
+<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${sorts.map(([k, l]) => html`<button class="chip" data-act="album-sort" data-key="${k}" aria-pressed="${String(s === k)}">${l}</button>`)}</div>
+${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="group" aria-label="Filtrer par genre"><button class="chip" data-act="album-genre" data-key="" aria-pressed="${String(!UI.albumGenre)}">Tous les genres</button>${genres.map((g) => html`<button class="chip" data-act="album-genre" data-key="${g.name}" aria-pressed="${String(UI.albumGenre === g.name)}">${g.name}</button>`)}</div>` : ""}
 <div class="grid" style="margin-top:24px">${list.map((a) => albumCard(a.key))}</div>`;
   },
 
@@ -3944,7 +4197,7 @@ ${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="grou
     const s = UI.artistSort;
     const list = [...L.artists.values()].sort(s === "plays" ? (a, b) => b.plays - a.plays || cmp(a.name, b.name) : s === "tracks" ? (a, b) => b.tracks.length - a.tracks.length : (a, b) => cmp(artistSortKey(a.name), artistSortKey(b.name)));
     return html`<div class="view-head"><div><h1 class="h-page">Artistes</h1><div class="sub">${plural(list.length, "artiste", "artistes")}</div></div></div>
-<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${[["az", "A → Z"], ["plays", "Les plus écoutés"], ["tracks", "Le plus de titres"]].map(([k, l]) => html`<button class="chip" data-act="artist-sort" data-key="${k}" aria-pressed="${s === k}">${l}</button>`)}</div>
+<div class="chips" style="margin-top:18px" role="group" aria-label="Trier par">${[["az", "A → Z"], ["plays", "Les plus écoutés"], ["tracks", "Le plus de titres"]].map(([k, l]) => html`<button class="chip" data-act="artist-sort" data-key="${k}" aria-pressed="${String(s === k)}">${l}</button>`)}</div>
 <div class="grid" style="margin-top:24px">${list.map((a) => artistCard(a.key))}</div>`;
   },
 
@@ -3958,7 +4211,7 @@ ${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="grou
 <div class="dhead-line">${a.artist !== "Artistes variés" ? html`<button data-act="open-artist" data-key="${norm(a.artist)}"><b>${a.artist}</b></button>` : html`<b>Artistes variés</b>`}${a.year ? html`<span class="dot">${a.year}</span>` : ""}<span class="dot">${plural(a.tracks.length, "titre", "titres")}, ${fmtLong(a.duration)}</span>${a.genre ? html`<span class="dot">${a.genre}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire l'album">${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
-<button class="icon-btn heart${allLiked ? " on" : ""}" data-act="like-many" data-ctx="${ref}" aria-pressed="${allLiked}" aria-label="${allLiked ? "Retirer l'album des titres likés" : "Liker tout l'album"}">${icon("heart")}</button>
+<button class="icon-btn heart${allLiked ? " on" : ""}" data-act="like-many" data-ctx="${ref}" aria-pressed="${String(allLiked)}" aria-label="${allLiked ? "Retirer l'album des titres likés" : "Liker tout l'album"}">${icon("heart")}</button>
 <button class="icon-btn" data-act="ctx-menu" data-ctx="${ref}" aria-label="Plus d'options">${icon("more")}</button></div>
 ${trackList(a.tracks, { album: false, cover: false, numbering: "track", discs: a.discs > 1, label: a.title, ref })}
 ${others.length ? shelf(`Plus de ${a.artist}`, others.map(albumCard)) : ""}`;
@@ -3989,7 +4242,7 @@ ${feat.length ? shelf("Apparaît sur", feat.map((a) => albumCard(a.key))) : ""}`
     const ref = "list:" + id;
     let dur = 0; for (const x of s.ids) dur += L.tracks.get(x).duration || 0;
     const arts = [...new Set(s.ids.map((x) => L.tracks.get(x).artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
-    const cover = s.auto ? html`<div class="cover" style="--cc:transparent;background:linear-gradient(135deg,var(--c1),var(--c3))"><div class="ph" style="background:none;color:var(--on-c1)">${icon(s.ic)}</div></div>`
+    const cover = s.auto ? html`<div class="cover" style="--cc:transparent;background:linear-gradient(135deg,${s.mood ? s.mood.c[0] : "var(--c1)"},${s.mood ? s.mood.c[1] : "var(--c3)"})"><div class="ph" style="background:none;color:var(--on-c1)">${icon(s.ic)}</div></div>`
       : html`<div class="cover" style="--cc:${placeholderColor(s.name)}">${arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`}</div>`;
     const editing = UI.editing === id;
     return html`<header class="dhead" style="--hc:${s.auto ? "var(--c1)" : placeholderColor(s.name)}">${cover}
@@ -4012,8 +4265,10 @@ ${s.ids.length ? trackList(s.ids, { label: s.name, ref, playlist: s.p ? id : nul
     const ids = tracks.slice(0, 50).map((x) => x[0]);
     const artists = [...L.artists.values()].filter((a) => hit(a.name)).sort((a, b) => (norm(b.name).startsWith(nq) - norm(a.name).startsWith(nq)) || b.plays - a.plays).slice(0, 12);
     const albums = [...L.albums.values()].filter((a) => hit(a.title + " " + a.artist)).sort((a, b) => (norm(b.title).startsWith(nq) - norm(a.title).startsWith(nq)) || b.plays - a.plays).slice(0, 12);
-    if (!ids.length && !artists.length && !albums.length) return html`<div class="empty"><div class="big-ic">${icon("search", "lg")}</div><h2>Aucun résultat pour « ${q} »</h2><p>Vérifie l'orthographe, ou essaie un bout du titre, de l'artiste ou de l'album.</p><button class="btn" data-act="nav" data-view="discover">${icon("sparkles", "sm")} Chercher de nouveaux artistes</button></div>`;
+    if (!ids.length && !artists.length && !albums.length && !HUMEURS.some((m) => words.some((w) => w.length > 2 && norm(m.name).startsWith(w))) && !/humeur|ambiance|mood/.test(nq)) return html`<div class="empty"><div class="big-ic">${icon("search", "lg")}</div><h2>Aucun résultat pour « ${q} »</h2><p>Vérifie l'orthographe, ou essaie un bout du titre, de l'artiste ou de l'album.</p><button class="btn" data-act="nav" data-view="discover">${icon("sparkles", "sm")} Chercher de nouveaux artistes</button></div>`;
+    const moodHits = HUMEURS.filter((m) => words.some((w) => w.length > 2 && (norm(m.name).startsWith(w) || norm(m.hint).includes(w))) || (nq.length > 2 && /humeur|ambiance|mood/.test(nq)));
     return html`<div class="view-head"><div><h1 class="h-page">Résultats</h1><div class="sub">pour « ${q} »</div></div></div>
+${moodHits.length ? html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Humeurs</h2></div><div class="moods">${moodHits.map((m) => moodCard(m, An.moods()[m.k].length))}</div></section>` : ""}
 ${artists.length ? shelf("Artistes", artists.map((a) => artistCard(a.key))) : ""}
 ${ids.length ? html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Titres</h2></div>${trackList(ids.slice(0, 20), { label: `Recherche « ${q} »`, ref: "search:" + q })}</section>` : ""}
 ${albums.length ? shelf("Albums", albums.map((a) => albumCard(a.key))) : ""}`;
@@ -4141,7 +4396,7 @@ const Guide = {
 };
 
 /* ===================== découvertes (Claude, via la capacité « sample ») ===================== */
-const MOODS = [
+const DISC_MOODS = [
   ["proche", "Dans la même veine", "dans la même veine que mes artistes préférés"],
   ["pepites", "Pépites peu connues", "des pépites peu connues, avec peu d'écoutes sur les plateformes, mais qui restent dans mes goûts"],
   ["calme", "Plus calme", "plus calme, doux et posé que ce que j'écoute d'habitude, sans changer complètement de style"],
@@ -4172,7 +4427,7 @@ const Disc = {
     const lines = s.list.map((a) => `- ${a.name}${a.plays ? ` (${a.plays} écoutes)` : a.tracks ? ` (${a.tracks} titres)` : ""}${a.genre ? ` — ${a.genre}` : ""}`).join("\n");
     const genres = L.genres.slice(0, 8).map((g) => g.name).join(", ");
     const known = [...new Set([...[...L.artists.values()].map((a) => a.name).filter((n) => n !== UNKNOWN_ARTIST), ...this.seen, ...L.saved.map((x) => x.artist)])].slice(0, forChat ? 60 : 300).join(", ");
-    const mood = (MOODS.find((m) => m[0] === this.mood) || MOODS[0])[2];
+    const mood = (DISC_MOODS.find((m) => m[0] === this.mood) || DISC_MOODS[0])[2];
     return `Tu es un disquaire passionné, curieux et pointu. Recommande-moi 8 artistes à découvrir.
 
 ${s.kind === "plays" ? "Ce que j'écoute le plus dans mon lecteur (nombre d'écoutes) :" : "Les artistes les plus présents dans ma bibliothèque :"}
@@ -4239,7 +4494,7 @@ ${forChat ? "Présente chaque artiste avec : son nom, son genre, le pays et l'é
     const initials = it.artist.replace(/^(the|les|le|la)\s+/i, "").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
     const isSaved = L.saved.some((x) => norm(x.artist) === norm(it.artist));
     return html`<article class="dcard" style="--dc:hsl(${hue} 72% 68%);animation-delay:${saved ? 0 : Math.min(i, 7) * 40}ms">
-<div class="dc-actions">${saved ? html`<button class="icon-btn" data-act="unsave-artist" data-i="${i}" aria-label="Retirer de ma liste">${icon("x", "sm")}</button>` : html`<button class="icon-btn${isSaved ? " on" : ""}" data-act="save-artist" data-i="${i}" aria-pressed="${isSaved}" aria-label="${isSaved ? "Déjà dans ma liste" : "Garder dans ma liste À découvrir"}" title="Garder pour plus tard">${icon("bookmark", "sm")}</button><button class="icon-btn" data-act="dismiss-artist" data-i="${i}" aria-label="Pas pour moi" title="Pas pour moi">${icon("x", "sm")}</button>`}</div>
+<div class="dc-actions">${saved ? html`<button class="icon-btn" data-act="unsave-artist" data-i="${i}" aria-label="Retirer de ma liste">${icon("x", "sm")}</button>` : html`<button class="icon-btn${isSaved ? " on" : ""}" data-act="save-artist" data-i="${i}" aria-pressed="${String(isSaved)}" aria-label="${isSaved ? "Déjà dans ma liste" : "Garder dans ma liste À découvrir"}" title="Garder pour plus tard">${icon("bookmark", "sm")}</button><button class="icon-btn" data-act="dismiss-artist" data-i="${i}" aria-label="Pas pour moi" title="Pas pour moi">${icon("x", "sm")}</button>`}</div>
 <div class="dc-top"><span class="dc-av" aria-hidden="true">${initials}</span><div style="min-width:0;padding-right:64px"><h3 class="dc-name">${it.artist}</h3><div class="dc-genre">${[it.genre, it.from].filter(Boolean).join(" · ")}</div></div></div>
 ${it.because ? html`<p class="dc-why">${it.because}</p>` : ""}
 ${it.tracks.length ? html`<div class="dc-tracks">${it.tracks.map((t) => html`<a href="${this.links(it.artist, t).yt}" target="_blank" rel="noopener noreferrer">${icon("play")}<span>${t}</span></a>`)}</div>` : ""}
@@ -4251,7 +4506,7 @@ ${it.tracks.length ? html`<div class="dc-tracks">${it.tracks.map((t) => html`<a 
     const head = html`<div class="view-head"><div><h1 class="h-page">Découvertes</h1><div class="sub">Des artistes choisis d'après ce que tu écoutes le plus.</div></div></div>`;
     if (!s.list.length) return html`${head}<div class="empty"><div class="big-ic">${icon("sparkles", "lg")}</div><h2>Il me faut un peu de ta musique</h2><p>Les suggestions partent des artistes que tu écoutes. Ajoute ton dossier de musique, écoute quelques titres, puis reviens ici.</p><button class="btn primary" data-act="import-dir">${icon("folder", "sm")} Ouvrir mon dossier</button></div>${this.savedHTML()}`;
     const seedsHTML = html`<div class="disc-seeds">${this.seed ? html`<span class="seed">Autour de ${this.seed}</span><button class="chip" style="height:26px" data-act="disc-seed-clear">Revenir à mes favoris</button>` : s.list.slice(0, 8).map((a) => html`<span class="seed">${a.name}${a.plays ? html` <span class="mono">${a.plays}</span>` : ""}</span>`)}</div>`;
-    const moods = html`<div class="chips" style="margin-top:14px" role="group" aria-label="Envie du moment">${MOODS.map(([k, l]) => html`<button class="chip" data-act="disc-mood" data-key="${k}" aria-pressed="${this.mood === k}">${l}</button>`)}</div>`;
+    const moods = html`<div class="chips" style="margin-top:14px" role="group" aria-label="Envie du moment">${DISC_MOODS.map(([k, l]) => html`<button class="chip" data-act="disc-mood" data-key="${k}" aria-pressed="${String(this.mood === k)}">${l}</button>`)}</div>`;
     let action;
     if (this.api === undefined) action = html`<button class="btn" disabled>Connexion à Claude…</button>`;
     else if (this.api === null || this.state === "denied") action = "";
@@ -4407,6 +4662,10 @@ const ACTIONS = {
   "guide-next": () => Guide.go(1),
   "guide-prev": () => Guide.go(-1),
   "guide-open-auto": () => Guide.openAuto(),
+  "set-norm": () => { Fx.setNorm(!Fx.norm); openSettings(); },
+  "eq-open": () => openEq(),
+  "eq-toggle": () => { Fx.setOn(!Fx.eqOn); openEq(); },
+  "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -4458,13 +4717,15 @@ async function openSettings() {
   openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Réglages</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
 <div style="margin-top:10px">
 <div class="set-row theme-row"><div style="min-width:0;flex:1"><b>Fond</b>
-  <div class="theme-bgs" role="radiogroup" aria-label="Fond">${BACKGROUNDS.map(([k, l, d]) => html`<button class="theme-bg tb-${k}" role="radio" aria-checked="${Theme.bg === k}" data-act="theme-bg" data-v="${k}"><span class="tb-prev" aria-hidden="true"><i></i><i></i><i></i></span><b>${l}</b><small>${d}</small></button>`)}</div>
+  <div class="theme-bgs" role="radiogroup" aria-label="Fond">${BACKGROUNDS.map(([k, l, d]) => html`<button class="theme-bg tb-${k}" role="radio" aria-checked="${String(Theme.bg === k)}" data-act="theme-bg" data-v="${k}"><span class="tb-prev" aria-hidden="true"><i></i><i></i><i></i></span><b>${l}</b><small>${d}</small></button>`)}</div>
   <b style="display:block;margin-top:16px">Couleurs</b><p>${Theme.accent === "pochette" ? "Elles changent avec la pochette du titre en cours." : "Les mêmes couleurs pour tous les titres."}</p>
-  <div class="theme-acc" role="radiogroup" aria-label="Couleurs">${Object.entries(ACCENTS).map(([k, a]) => html`<button role="radio" aria-checked="${Theme.accent === k}" data-act="theme-accent" data-v="${k}" title="${a.name}"><span class="sw${k === "pochette" ? " auto" : ""}" style="${a.c1 ? `background:conic-gradient(${a.c1} 0 120deg, ${a.c2} 0 240deg, ${a.c3} 0)` : ""}"></span><small>${a.name}</small></button>`)}</div>
+  <div class="theme-acc" role="radiogroup" aria-label="Couleurs">${Object.entries(ACCENTS).map(([k, a]) => html`<button role="radio" aria-checked="${String(Theme.accent === k)}" data-act="theme-accent" data-v="${k}" title="${a.name}"><span class="sw${k === "pochette" ? " auto" : ""}" style="${a.c1 ? `background:conic-gradient(${a.c1} 0 120deg, ${a.c2} 0 240deg, ${a.c3} 0)` : ""}"></span><small>${a.name}</small></button>`)}</div>
 </div></div>
 ${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>Mes dossiers de musique</b><p>aurore les surveille : ajoute ou supprime de la musique dedans, la bibliothèque suit toute seule.</p>${folders.map((d) => { const lib = d === NATIVE_LIBRARY; return html`<div class="folder-row"><span class="mono" title="${d}">${lib ? html`<b>Dossier aurore</b> · ` : ""}${d}</span><button class="icon-btn" data-act="open-folder" data-dir="${d}" aria-label="Ouvrir dans l'Explorateur" title="Ouvrir dans l'Explorateur">${icon("external", "sm")}</button>${lib ? "" : html`<button class="icon-btn" data-act="folder-remove" data-dir="${d}" aria-label="Ne plus suivre ce dossier" title="Ne plus suivre">${icon("x", "sm")}</button>`}</div>`; })}</div><button class="btn sm" data-act="folder-add">${icon("plus", "sm")} Suivre un dossier</button></div>` : ""}
-${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${L.memorize}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
-<div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${Viz.calm}" data-act="set-calm" aria-label="Animations douces"></button></div>
+${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${String(L.memorize)}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
+<div class="set-row"><div><b>Égaliseur</b><p>${Fx.eqOn ? `Activé : ${(EQ_PRESETS.find((p) => p[0] === Fx.preset) || ["", "Perso"])[1]}.` : "Désactivé."} Basses, voix, aigus… sur 6 bandes.</p></div><button class="btn sm" data-act="eq-open">${icon("eq", "sm")} Régler</button></div>
+<div class="set-row"><div><b>Volume égalisé</b><p>Tous les titres au même volume, plus de sursaut d'un morceau à l'autre. <span id="an-status">${anStatus()}</span></p></div><button class="switch" role="switch" aria-checked="${String(Fx.norm)}" data-act="set-norm" aria-label="Volume égalisé"></button></div>
+<div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${String(Viz.calm)}" data-act="set-calm" aria-label="Animations douces"></button></div>
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
 ${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
@@ -4474,6 +4735,29 @@ ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b>
 ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
 </div>`);
+}
+function anStatus() { const left = An.total - An.done; return left > 0 ? `Analyse en cours : ${An.done} / ${An.total} titres.` : An.done ? `${plural(An.done, "titre analysé", "titres analysés")}.` : ""; }
+/* égaliseur : préréglages, 6 curseurs, courbe */
+function eqCurve() {
+  const W = 320, H = 90, fs = Array.from({ length: 80 }, (_, i) => 30 * Math.pow(16000 / 30, i / 79)), r = Fx.response(fs);
+  const pts = fs.map((f, i) => `${(i / 79 * W).toFixed(1)},${(H / 2 - clamp(r[i], -14, 14) / 14 * (H / 2 - 6)).toFixed(1)}`).join(" ");
+  return html`<svg class="eq-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="eq-zero"/><polyline points="${pts} ${W},${H} 0,${H}" class="eq-fill"/><polyline points="${pts}" class="eq-line"/></svg>`;
+}
+function openEq() {
+  const lbl = (f) => (f >= 1000 ? f / 1000 + " k" : f) + "";
+  openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Égaliseur</h2><span style="display:flex;gap:8px;align-items:center"><button class="switch" role="switch" aria-checked="${String(Fx.eqOn)}" data-act="eq-toggle" aria-label="Activer l'égaliseur"></button><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></span></div>
+<div class="eqz${Fx.eqOn ? "" : " off"}">
+  <div class="eq-presets" role="radiogroup" aria-label="Préréglages">${EQ_PRESETS.map(([k, n]) => html`<button role="radio" aria-checked="${String(Fx.eqOn && Fx.preset === k)}" data-act="eq-preset" data-v="${k}">${n}</button>`)}${Fx.preset === "perso" && Fx.eqOn ? html`<button role="radio" aria-checked="true">Perso</button>` : ""}</div>
+  <div class="eq-graph" id="eq-graph">${eqCurve()}</div>
+  <div class="eq-bands">${EQ_FREQS.map((f, i) => html`<label class="eq-band"><span class="mono eq-val" id="eq-v${i}">${Fx.eq[i] > 0 ? "+" : ""}${Fx.eq[i]}</span><input type="range" min="-12" max="12" step="0.5" value="${Fx.eq[i]}" data-band="${i}" aria-label="${lbl(f)}Hz" style="--p:${((Fx.eq[i] + 12) / 24 * 100).toFixed(1)}%"><span class="mono">${lbl(f)}Hz</span></label>`)}</div>
+  <p class="eq-note">${NP && NP.ok ? "Appliqué aussi quand l'app est fermée." : Player.split ? "Sur téléphone dans le navigateur, l'égaliseur ne s'applique pas : installe l'app aurore." : "Les réglages restent d'une écoute à l'autre."}</p>
+</div>`);
+  for (const inp of $$("#sheet .eq-bands input")) inp.addEventListener("input", () => {
+    const eq = Fx.eq.slice(); eq[+inp.dataset.band] = +inp.value; if (!Fx.eqOn) { Fx.eqOn = true; store.set("eqOn", true); $("#sheet .eqz")?.classList.remove("off"); $("#sheet [data-act='eq-toggle']")?.setAttribute("aria-checked", "true"); }
+    inp.style.setProperty("--p", ((+inp.value + 12) / 24 * 100).toFixed(1) + "%");
+    Fx.set(eq, "perso"); const v = $("#eq-v" + inp.dataset.band); if (v) v.textContent = (eq[+inp.dataset.band] > 0 ? "+" : "") + eq[+inp.dataset.band];
+    setHTML($("#eq-graph"), eqCurve()); for (const b of $$("#sheet [data-act='eq-preset']")) b.setAttribute("aria-checked", "false");
+  });
 }
 function openKeys() {
   const k = [["Espace", "Lecture / pause"], ["→ / ←", "Avancer / reculer de 5 s"], ["Maj + → / ←", "Titre suivant / précédent"], ["Ctrl + ↑ / ↓", "Volume"], ["M", "Couper le son"], ["S", "Aléatoire"], ["R", "Répéter"], ["L", "Liker le titre en cours"], ["F", "Mode immersif"], ["1 à 6", "Visualiseur : halo, spectre, onde, paysage, éclats, rétro"], ["/", "Rechercher"], ["Échap", "Fermer"]];
@@ -4632,6 +4916,7 @@ async function boot() {
   UI.syncControls(); UI.syncTime();
   Disc.init();
   await autoReattach();
+  setTimeout(() => An.start(), 2500);
   if (Q.current && !Player.id && L.files.has(Q.current)) { Q.session = { id: Q.current, listened: 0, counted: false, last: null }; Player.load(Q.current, { autoplay: false, startAt: store.get("q", {})?.t || 0 }); }
   Updates.init();
 }
@@ -4657,7 +4942,7 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS };
 boot();
 
 })();

@@ -73,7 +73,7 @@ function rowHTML(id, i, opts) {
 <div class="c-title">${opts.cover ? thumbHTML(t.artKey) : ""}<div><div class="t-name" title="${t.title}">${t.title}</div><div class="t-artist">${artistLinks(t)}</div></div></div>
 ${opts.album ? html`<div class="c-album">${t.albumKey ? html`<button data-act="open-album" data-key="${t.albumKey}">${t.album}</button>` : ""}</div>` : ""}
 <div class="c-plays">${playsOf(id) || ""}</div>
-<div class="c-like"><button class="icon-btn heart${liked ? " on" : ""}" data-act="like" aria-pressed="${liked}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart", "sm")}</button></div>
+<div class="c-like"><button class="icon-btn heart${liked ? " on" : ""}" data-act="like" aria-pressed="${String(liked)}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart", "sm")}</button></div>
 <div class="c-dur">${t.duration ? fmtTime(t.duration) : "–"}</div>
 <div class="c-more"><button class="icon-btn" data-act="row-menu" aria-label="Plus d'options pour ${t.title}">${icon("more", "sm")}</button></div>
 </div>`;
@@ -248,6 +248,9 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     } else body = html`<span>Ta bibliothèque est vide.</span>`;
     setHTML(el, body);
   },
+  onAnalysis() {
+    if (this._anT) return; this._anT = setTimeout(() => { this._anT = null; if (this.view.name === "home" && !this.imm) this.rerender(); const s = $("#an-status"); if (s) s.textContent = anStatus(); }, 1500);
+  },
   onLibraryChanged() { this.renderNav(); this.onLibraryProgress(); if (["home", "tracks", "albums", "artists", "album", "artist", "list", "search", "discover"].includes(this.view.name)) this.rerender(); },
   onStatsChanged() { if (this.view.name === "home" && !this.imm) this.rerender(); },
   onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); if (NP && Player.mode === "native") NP.refreshSoon(); },
@@ -406,7 +409,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     setHTML(np, html`<div class="np-head"><span class="np-ctx" title="${Q.label}">${Q.label || "En cours"}</span><button class="icon-btn" data-act="toggle-np" aria-label="Fermer le panneau">${icon("x", "sm")}</button></div>
 <div class="np-body">
   <div class="np-cover">${artBig(t.artKey) ? html`<img src="${artBig(t.artKey)}" alt="Pochette de ${t.album || t.title}">` : html`<div class="ph">${icon("music", "lg")}</div>`}<button class="icon-btn" data-act="immersive" aria-label="Mode immersif">${icon("expand", "sm")}</button></div>
-  <div class="np-titles"><div><div class="np-title">${t.title}</div><div class="np-artist">${artistLinks(t)}</div></div><button class="icon-btn heart js-like${liked ? " on" : ""}" data-act="like-current" aria-pressed="${liked}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart")}</button></div>
+  <div class="np-titles"><div><div class="np-title">${t.title}</div><div class="np-artist">${artistLinks(t)}</div></div><button class="icon-btn heart js-like${liked ? " on" : ""}" data-act="like-current" aria-pressed="${String(liked)}" aria-label="${liked ? "Retirer des titres likés" : "Ajouter aux titres likés"}">${icon("heart")}</button></div>
   <div class="viz-box"><canvas id="np-viz" aria-hidden="true"></canvas><div class="viz-cap"><span>32 Hz</span><span>${info}</span><span>16 kHz</span></div></div>
   ${this.queueHTML(up)}
 </div>`);
@@ -451,9 +454,9 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
     setHTML(el, html`<div class="imm-bg" style="${big ? `background-image:url('${big}')` : ""}"></div><canvas aria-hidden="true"></canvas>
 <div class="imm-top"><button class="icon-btn" data-act="close-imm" aria-label="Fermer le mode immersif" title="Fermer (Échap)">${icon("down")}</button>
 <div class="ctx"><small>Lecture depuis</small><span>${Q.label || "ta bibliothèque"}</span></div>
-<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${Viz.mode === k}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
+<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${String(Viz.mode === k)}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
 <button class="viz-pick" data-act="viz-menu" aria-label="Changer de visualiseur">${icon((modes.find((m) => m[0] === Viz.mode) || modes[0])[2], "sm")}<span>${(modes.find((m) => m[0] === Viz.mode) || modes[0])[1]}</span></button>
-<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${this.immQueue}">${icon("queue", "sm")}</button></div>
+<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${String(this.immQueue)}">${icon("queue", "sm")}</button></div>
 <div></div>
 <div class="imm-bottom">
   <div class="imm-meta"><div class="d-cover">${t && artSmall(t.artKey) ? html`<img src="${artSmall(t.artKey)}" alt="">` : icon("music")}</div><div><div class="imm-title">${t ? t.title : "Rien en lecture"}</div><div class="imm-artist">${t ? html`${t.artist}${t.album ? " · " + t.album : ""}` : "Lance un titre depuis ta bibliothèque"}</div></div><button class="icon-btn heart js-like" data-act="like-current" aria-label="Ajouter aux titres likés">${icon("heart")}</button></div>

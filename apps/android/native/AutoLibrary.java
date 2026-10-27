@@ -32,6 +32,7 @@ final class AutoLibrary {
     static final class Track {
         String id, title, artist, album, art;
         long mid;
+        float gain;
     }
 
     static final class Group {
@@ -89,7 +90,7 @@ final class AutoLibrary {
             if (ts != null) for (int i = 0; i < ts.length(); i++) {
                 JSONArray a = ts.getJSONArray(i);
                 Track t = new Track();
-                t.id = a.getString(0); t.mid = a.getLong(1); t.title = a.optString(2, ""); t.artist = a.optString(3, ""); t.album = a.optString(4, ""); t.art = a.optString(5, "");
+                t.id = a.getString(0); t.mid = a.getLong(1); t.title = a.optString(2, ""); t.artist = a.optString(3, ""); t.album = a.optString(4, ""); t.art = a.optString(5, ""); t.gain = (float) a.optDouble(6, 0);
                 tracks.put(t.id, t);
                 order.add(t.id);
             }
@@ -140,13 +141,13 @@ final class AutoLibrary {
 
     private MediaItem trackIn(String parent, String id) {
         Track t = tracks.get(id);
-        MediaItem base = AuroreService.track(t.id, t.mid, t.title, t.artist, t.album, t.art);
+        MediaItem base = AuroreService.track(t.id, t.mid, t.title, t.artist, t.album, t.art, t.gain);
         return base.buildUpon().setMediaId(parent + "|" + t.id).build();
     }
 
     private MediaItem playableTrack(String id) {
         Track t = tracks.get(id);
-        return t == null ? null : AuroreService.track(t.id, t.mid, t.title, t.artist, t.album, t.art);
+        return t == null ? null : AuroreService.track(t.id, t.mid, t.title, t.artist, t.album, t.art, t.gain);
     }
 
     private static String firstArt(Map<String, Track> tracks, List<String> ids) {

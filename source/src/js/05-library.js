@@ -294,7 +294,7 @@ async function importEntries(entries, opts = {}) {
   const added = todo.length;
   L.importing = null;
   UI.onLibraryProgress();
-  UI.onLibraryChanged();
+  UI.onLibraryChanged(); setTimeout(() => An.start(), 1500);
   if (added && attached) toast(`${plural(added, "nouveau titre", "nouveaux titres")}, ${plural(attached, "titre retrouvé", "titres retrouvés")}.`);
   else if (added) toast(`${plural(added, "titre ajouté", "titres ajoutés")} à ta bibliothèque.`);
   else if (!opts.quiet) toast(`Ta musique est prête : ${plural(attached, "titre", "titres")}.`);

@@ -128,6 +128,10 @@ const ACTIONS = {
   "guide-next": () => Guide.go(1),
   "guide-prev": () => Guide.go(-1),
   "guide-open-auto": () => Guide.openAuto(),
+  "set-norm": () => { Fx.setNorm(!Fx.norm); openSettings(); },
+  "eq-open": () => openEq(),
+  "eq-toggle": () => { Fx.setOn(!Fx.eqOn); openEq(); },
+  "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -179,13 +183,15 @@ async function openSettings() {
   openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Réglages</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
 <div style="margin-top:10px">
 <div class="set-row theme-row"><div style="min-width:0;flex:1"><b>Fond</b>
-  <div class="theme-bgs" role="radiogroup" aria-label="Fond">${BACKGROUNDS.map(([k, l, d]) => html`<button class="theme-bg tb-${k}" role="radio" aria-checked="${Theme.bg === k}" data-act="theme-bg" data-v="${k}"><span class="tb-prev" aria-hidden="true"><i></i><i></i><i></i></span><b>${l}</b><small>${d}</small></button>`)}</div>
+  <div class="theme-bgs" role="radiogroup" aria-label="Fond">${BACKGROUNDS.map(([k, l, d]) => html`<button class="theme-bg tb-${k}" role="radio" aria-checked="${String(Theme.bg === k)}" data-act="theme-bg" data-v="${k}"><span class="tb-prev" aria-hidden="true"><i></i><i></i><i></i></span><b>${l}</b><small>${d}</small></button>`)}</div>
   <b style="display:block;margin-top:16px">Couleurs</b><p>${Theme.accent === "pochette" ? "Elles changent avec la pochette du titre en cours." : "Les mêmes couleurs pour tous les titres."}</p>
-  <div class="theme-acc" role="radiogroup" aria-label="Couleurs">${Object.entries(ACCENTS).map(([k, a]) => html`<button role="radio" aria-checked="${Theme.accent === k}" data-act="theme-accent" data-v="${k}" title="${a.name}"><span class="sw${k === "pochette" ? " auto" : ""}" style="${a.c1 ? `background:conic-gradient(${a.c1} 0 120deg, ${a.c2} 0 240deg, ${a.c3} 0)` : ""}"></span><small>${a.name}</small></button>`)}</div>
+  <div class="theme-acc" role="radiogroup" aria-label="Couleurs">${Object.entries(ACCENTS).map(([k, a]) => html`<button role="radio" aria-checked="${String(Theme.accent === k)}" data-act="theme-accent" data-v="${k}" title="${a.name}"><span class="sw${k === "pochette" ? " auto" : ""}" style="${a.c1 ? `background:conic-gradient(${a.c1} 0 120deg, ${a.c2} 0 240deg, ${a.c3} 0)` : ""}"></span><small>${a.name}</small></button>`)}</div>
 </div></div>
 ${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>Mes dossiers de musique</b><p>aurore les surveille : ajoute ou supprime de la musique dedans, la bibliothèque suit toute seule.</p>${folders.map((d) => { const lib = d === NATIVE_LIBRARY; return html`<div class="folder-row"><span class="mono" title="${d}">${lib ? html`<b>Dossier aurore</b> · ` : ""}${d}</span><button class="icon-btn" data-act="open-folder" data-dir="${d}" aria-label="Ouvrir dans l'Explorateur" title="Ouvrir dans l'Explorateur">${icon("external", "sm")}</button>${lib ? "" : html`<button class="icon-btn" data-act="folder-remove" data-dir="${d}" aria-label="Ne plus suivre ce dossier" title="Ne plus suivre">${icon("x", "sm")}</button>`}</div>`; })}</div><button class="btn sm" data-act="folder-add">${icon("plus", "sm")} Suivre un dossier</button></div>` : ""}
-${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${L.memorize}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
-<div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${Viz.calm}" data-act="set-calm" aria-label="Animations douces"></button></div>
+${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${String(L.memorize)}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
+<div class="set-row"><div><b>Égaliseur</b><p>${Fx.eqOn ? `Activé : ${(EQ_PRESETS.find((p) => p[0] === Fx.preset) || ["", "Perso"])[1]}.` : "Désactivé."} Basses, voix, aigus… sur 6 bandes.</p></div><button class="btn sm" data-act="eq-open">${icon("eq", "sm")} Régler</button></div>
+<div class="set-row"><div><b>Volume égalisé</b><p>Tous les titres au même volume, plus de sursaut d'un morceau à l'autre. <span id="an-status">${anStatus()}</span></p></div><button class="switch" role="switch" aria-checked="${String(Fx.norm)}" data-act="set-norm" aria-label="Volume égalisé"></button></div>
+<div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${String(Viz.calm)}" data-act="set-calm" aria-label="Animations douces"></button></div>
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
 ${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
@@ -195,6 +201,29 @@ ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b>
 ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
 </div>`);
+}
+function anStatus() { const left = An.total - An.done; return left > 0 ? `Analyse en cours : ${An.done} / ${An.total} titres.` : An.done ? `${plural(An.done, "titre analysé", "titres analysés")}.` : ""; }
+/* égaliseur : préréglages, 6 curseurs, courbe */
+function eqCurve() {
+  const W = 320, H = 90, fs = Array.from({ length: 80 }, (_, i) => 30 * Math.pow(16000 / 30, i / 79)), r = Fx.response(fs);
+  const pts = fs.map((f, i) => `${(i / 79 * W).toFixed(1)},${(H / 2 - clamp(r[i], -14, 14) / 14 * (H / 2 - 6)).toFixed(1)}`).join(" ");
+  return html`<svg class="eq-curve" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" class="eq-zero"/><polyline points="${pts} ${W},${H} 0,${H}" class="eq-fill"/><polyline points="${pts}" class="eq-line"/></svg>`;
+}
+function openEq() {
+  const lbl = (f) => (f >= 1000 ? f / 1000 + " k" : f) + "";
+  openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Égaliseur</h2><span style="display:flex;gap:8px;align-items:center"><button class="switch" role="switch" aria-checked="${String(Fx.eqOn)}" data-act="eq-toggle" aria-label="Activer l'égaliseur"></button><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></span></div>
+<div class="eqz${Fx.eqOn ? "" : " off"}">
+  <div class="eq-presets" role="radiogroup" aria-label="Préréglages">${EQ_PRESETS.map(([k, n]) => html`<button role="radio" aria-checked="${String(Fx.eqOn && Fx.preset === k)}" data-act="eq-preset" data-v="${k}">${n}</button>`)}${Fx.preset === "perso" && Fx.eqOn ? html`<button role="radio" aria-checked="true">Perso</button>` : ""}</div>
+  <div class="eq-graph" id="eq-graph">${eqCurve()}</div>
+  <div class="eq-bands">${EQ_FREQS.map((f, i) => html`<label class="eq-band"><span class="mono eq-val" id="eq-v${i}">${Fx.eq[i] > 0 ? "+" : ""}${Fx.eq[i]}</span><input type="range" min="-12" max="12" step="0.5" value="${Fx.eq[i]}" data-band="${i}" aria-label="${lbl(f)}Hz" style="--p:${((Fx.eq[i] + 12) / 24 * 100).toFixed(1)}%"><span class="mono">${lbl(f)}Hz</span></label>`)}</div>
+  <p class="eq-note">${NP && NP.ok ? "Appliqué aussi quand l'app est fermée." : Player.split ? "Sur téléphone dans le navigateur, l'égaliseur ne s'applique pas : installe l'app aurore." : "Les réglages restent d'une écoute à l'autre."}</p>
+</div>`);
+  for (const inp of $$("#sheet .eq-bands input")) inp.addEventListener("input", () => {
+    const eq = Fx.eq.slice(); eq[+inp.dataset.band] = +inp.value; if (!Fx.eqOn) { Fx.eqOn = true; store.set("eqOn", true); $("#sheet .eqz")?.classList.remove("off"); $("#sheet [data-act='eq-toggle']")?.setAttribute("aria-checked", "true"); }
+    inp.style.setProperty("--p", ((+inp.value + 12) / 24 * 100).toFixed(1) + "%");
+    Fx.set(eq, "perso"); const v = $("#eq-v" + inp.dataset.band); if (v) v.textContent = (eq[+inp.dataset.band] > 0 ? "+" : "") + eq[+inp.dataset.band];
+    setHTML($("#eq-graph"), eqCurve()); for (const b of $$("#sheet [data-act='eq-preset']")) b.setAttribute("aria-checked", "false");
+  });
 }
 function openKeys() {
   const k = [["Espace", "Lecture / pause"], ["→ / ←", "Avancer / reculer de 5 s"], ["Maj + → / ←", "Titre suivant / précédent"], ["Ctrl + ↑ / ↓", "Volume"], ["M", "Couper le son"], ["S", "Aléatoire"], ["R", "Répéter"], ["L", "Liker le titre en cours"], ["F", "Mode immersif"], ["1 à 6", "Visualiseur : halo, spectre, onde, paysage, éclats, rétro"], ["/", "Rechercher"], ["Échap", "Fermer"]];
@@ -353,6 +382,7 @@ async function boot() {
   UI.syncControls(); UI.syncTime();
   Disc.init();
   await autoReattach();
+  setTimeout(() => An.start(), 2500);
   if (Q.current && !Player.id && L.files.has(Q.current)) { Q.session = { id: Q.current, listened: 0, counted: false, last: null }; Player.load(Q.current, { autoplay: false, startAt: store.get("q", {})?.t || 0 }); }
   Updates.init();
 }
@@ -378,5 +408,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS };
 boot();
