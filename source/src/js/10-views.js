@@ -44,7 +44,7 @@ function shelf(title, items, more) {
 }
 function playlistCard(p) {
   const arts = [...new Set(p.ids.map((id) => L.tracks.get(id)?.artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
-  const inner = arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`;
+  const inner = p.artKey && artBig(p.artKey) ? html`<img src="${artBig(p.artKey)}" alt="">` : arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`;
   return html`<div class="card" data-act="open-list" data-id="${p.id}" role="button" tabindex="0" aria-label="${p.name}"><div class="cover" style="--cc:${placeholderColor(p.name)}">${inner}<button class="card-play" data-act="play-ctx" data-ctx="list:${p.id}" aria-label="Lire ${p.name}">${icon("play")}</button></div><div class="card-title">${p.name}</div><div class="card-sub">${plural(p.ids.length, "titre", "titres")}</div></div>`;
 }
 
@@ -210,7 +210,8 @@ ${feat.length ? shelf("Apparaît sur", feat.map((a) => albumCard(a.key))) : ""}`
     let dur = 0; for (const x of s.ids) dur += L.tracks.get(x).duration || 0;
     const arts = [...new Set(s.ids.map((x) => L.tracks.get(x).artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
     const cover = s.auto ? html`<div class="cover" style="--cc:transparent;background:linear-gradient(135deg,${s.mood ? s.mood.c[0] : "var(--c1)"},${s.mood ? s.mood.c[1] : "var(--c3)"})"><div class="ph" style="background:none;color:var(--on-c1)">${icon(s.ic)}</div></div>`
-      : html`<div class="cover" style="--cc:${placeholderColor(s.name)}">${arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`}</div>`;
+      : s.p && s.p.artKey && artBig(s.p.artKey) ? html`<button class="cover cover-edit" data-act="pl-photo" data-id="${id}" aria-label="Changer la photo de la playlist"><img src="${artBig(s.p.artKey)}" alt=""></button>`
+      : html`<${raw(s.p ? `button class="cover cover-edit" data-act="pl-photo" data-id="${esc(id)}" aria-label="Choisir une photo pour la playlist"` : 'div class="cover"')} style="--cc:${placeholderColor(s.name)}">${arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`}</${raw(s.p ? "button" : "div")}>`;
     const editing = UI.editing === id;
     return html`<header class="dhead" style="--hc:${s.auto ? "var(--c1)" : placeholderColor(s.name)}">${cover}
 <div class="dhead-meta"><span class="eyebrow">${s.kind}</span>${editing ? html`<h1 class="dhead-title long"><input class="title-input" id="pl-title" value="${s.name}" aria-label="Nom de la playlist" maxlength="80"></h1>` : html`<h1 class="dhead-title${s.name.length > 24 ? " long" : ""}">${s.p ? html`<button data-act="rename-list" data-id="${id}" title="Renommer" style="font:inherit;letter-spacing:inherit;text-align:left">${s.name}</button>` : s.name}</h1>`}

@@ -193,7 +193,7 @@ const NP = CAP ? {
     if (!tracks.length) return;
     const albums = L.sorted.albums.map((k) => L.albums.get(k)).filter((a) => a && !a.demo).map((a) => [a.key, a.title, a.artist || "", art(a.artKey), a.tracks.filter(media)]).filter((a) => a[4].length);
     const artists = L.sorted.artists.map((k) => L.artists.get(k)).filter(Boolean).map((a) => { const ids = a.tracks.filter(media); return [a.key, a.name, plural(ids.length, "titre", "titres"), art(a.artKey), ids]; }).filter((a) => a[4].length);
-    const playlists = L.playlists.map((p) => [p.id, p.name, plural(p.ids.length, "titre", "titres"), "", p.ids.filter(media)]).filter((p) => p[4].length);
+    const playlists = L.playlists.map((p) => [p.id, p.name, plural(p.ids.length, "titre", "titres"), art(p.artKey), p.ids.filter(media)]).filter((p) => p[4].length);
     const recent = L.sorted.tracks.filter(media).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)).slice(0, 100);
     const json = JSON.stringify({ v: 1, tracks, albums, artists, playlists, likes: [...L.likes].filter(media), top: topTracks(50).filter(media), recent });
     if (json === this._lastExport) return;

@@ -184,7 +184,7 @@ final class AutoLibrary {
                 for (Group g : artists) out.add(folder("artist:" + g.key, g.title, g.subtitle, g.art, MediaMetadata.MEDIA_TYPE_ARTIST, true));
                 return out;
             case "playlists":
-                for (Group g : playlists) out.add(folder("pl:" + g.key, g.title, g.subtitle, firstArt(tracks, g.ids), MediaMetadata.MEDIA_TYPE_PLAYLIST, true));
+                for (Group g : playlists) out.add(folder("pl:" + g.key, g.title, g.subtitle, g.art != null && !g.art.isEmpty() ? g.art : firstArt(tracks, g.ids), MediaMetadata.MEDIA_TYPE_PLAYLIST, true));
                 return out;
             default:
                 List<String> ids = list(parent);
@@ -261,7 +261,7 @@ final class AutoLibrary {
         if (q.isEmpty()) return out;
         for (Group g : artists) if (norm(g.title).contains(q)) out.add(folder("artist:" + g.key, g.title, g.subtitle, g.art, MediaMetadata.MEDIA_TYPE_ARTIST, true));
         for (Group g : albums) if (norm(g.title).contains(q)) out.add(folder("album:" + g.key, g.title, g.subtitle, g.art, MediaMetadata.MEDIA_TYPE_ALBUM, true));
-        for (Group g : playlists) if (norm(g.title).contains(q)) out.add(folder("pl:" + g.key, g.title, g.subtitle, firstArt(tracks, g.ids), MediaMetadata.MEDIA_TYPE_PLAYLIST, true));
+        for (Group g : playlists) if (norm(g.title).contains(q)) out.add(folder("pl:" + g.key, g.title, g.subtitle, g.art != null && !g.art.isEmpty() ? g.art : firstArt(tracks, g.ids), MediaMetadata.MEDIA_TYPE_PLAYLIST, true));
         for (String id : order) {
             Track t = tracks.get(id);
             if (norm(t.title).contains(q) || norm(t.artist).contains(q)) out.add(trackIn("search", id));

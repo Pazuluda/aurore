@@ -14,6 +14,7 @@ const Edit = {
   },
   openTrack(id) { const t = L.tracks.get(id); if (!t) return; this.kind = "track"; this.id = id; this.reset(); this.render(t.title, t.artist, t.album, t.year, t.genre, t.artKey); },
   openAlbum(key) { const a = L.albums.get(key); if (!a) return; this.kind = "album"; this.id = key; this.reset(); this.render(a.title, a.artist === "Artistes variés" ? "" : a.artist, null, a.year, a.genre || "", a.artKey); },
+  openPlaylist(id) { const p = L.playlists.find((x) => x.id === id); if (!p) return; this.kind = "playlist"; this.id = id; this.reset(); this.render(p.name, "", null, "", "", p.artKey || ""); },
   reset() { if (this.picUrl) URL.revokeObjectURL(this.picUrl); this.pic = null; this.picUrl = ""; this.dropPic = false; this.crop = null; },
   /* cadrage : on déplace l'image dans le carré et on zoome, la pochette sera exactement ce carré */
   bindCrop() {
@@ -51,21 +52,21 @@ const Edit = {
     this.reset(); this.pic = blob; this.picUrl = URL.createObjectURL(blob); this.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), artKey);
   },
   render(title, artist, album, year, genre, artKey) {
-    const isAlbum = this.kind === "album", cover = this.picUrl || (!this.dropPic && artKey ? artBig(artKey) : "");
-    openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>${isAlbum ? "Modifier l'album" : "Modifier le titre"}</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
+    const isAlbum = this.kind === "album", isPl = this.kind === "playlist", cover = this.picUrl || (!this.dropPic && artKey ? artBig(artKey) : "");
+    openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>${isPl ? "Modifier la playlist" : isAlbum ? "Modifier l'album" : "Modifier le titre"}</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
 <form class="edit" id="edit-form" autocomplete="off">
   <div class="edit-cover">
     ${this.picUrl ? html`<div class="crop-wrap"><div class="crop" id="crop" tabindex="0" aria-label="Cadrage de la pochette : fais glisser l'image, flèches du clavier pour la déplacer"><img src="${this.picUrl}" alt="" draggable="false"><span class="crop-grid" aria-hidden="true"></span></div>
       <label class="crop-zoom">${icon("image", "sm")}<input type="range" id="crop-zoom" min="1" max="4" step="0.01" value="${this.crop ? this.crop.zoom : 1}" aria-label="Zoom" style="--p:${this.crop ? ((this.crop.zoom - 1) / 3) * 100 : 0}%">${icon("image")}</label>
       <small class="crop-hint">Fais glisser l'image pour choisir ce qui reste dans le carré${isTouch() ? "" : " (molette pour zoomer)"}.</small></div>`
     : html`<div class="edit-pic" style="--cc:${placeholderColor(title || "?")}">${cover ? html`<img src="${cover}" alt="Pochette">` : html`<div class="ph">${icon(isAlbum ? "disc" : "music", "lg")}</div>`}</div>`}
-    <div class="edit-pic-btns"><label class="btn sm">${icon("image", "sm")} ${this.picUrl ? "Autre image" : "Choisir une image"}<input type="file" accept="image/*" id="edit-file" hidden></label>${cover && !this.picUrl ? html`<button type="button" class="btn sm ghost" data-act="edit-recrop">Recadrer</button>` : ""}${cover ? html`<button type="button" class="btn sm ghost" data-act="edit-nopic">Retirer</button>` : ""}<small>${isAlbum ? "Pour tous les titres de l'album." : "JPEG, PNG ou WebP."}</small></div>
+    <div class="edit-pic-btns"><label class="btn sm">${icon("image", "sm")} ${this.picUrl ? "Autre image" : "Choisir une image"}<input type="file" accept="image/*" id="edit-file" hidden></label>${cover && !this.picUrl ? html`<button type="button" class="btn sm ghost" data-act="edit-recrop">Recadrer</button>` : ""}${cover ? html`<button type="button" class="btn sm ghost" data-act="edit-nopic">Retirer</button>` : ""}<small>${isPl ? "Une photo à toi pour reconnaître la playlist." : isAlbum ? "Pour tous les titres de l'album." : "JPEG, PNG ou WebP."}</small></div>
   </div>
-  <label class="field"><span>${isAlbum ? "Nom de l'album" : "Titre"}</span><input name="title" value="${title || ""}" required maxlength="200"></label>
-  <label class="field"><span>Artiste</span><input name="artist" value="${artist || ""}" maxlength="200" placeholder="${isAlbum ? "Artistes variés" : "Artiste inconnu"}"></label>
-  ${isAlbum ? "" : html`<label class="field"><span>Album</span><input name="album" value="${album || ""}" maxlength="200" placeholder="Aucun (single)"></label>`}
-  <div class="field-row"><label class="field"><span>Année</span><input name="year" value="${year || ""}" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="2024"></label><label class="field"><span>Genre</span><input name="genre" value="${genre || ""}" maxlength="60" placeholder="Pop, jazz…"></label></div>
-  <p class="edit-note">${icon("info", "sm")}<span>Gardé dans aurore : tes fichiers ne sont pas modifiés.</span></p>
+  <label class="field"><span>${isPl ? "Nom de la playlist" : isAlbum ? "Nom de l'album" : "Titre"}</span><input name="title" value="${title || ""}" required maxlength="200"></label>
+  ${isPl ? "" : html`<label class="field"><span>Artiste</span><input name="artist" value="${artist || ""}" maxlength="200" placeholder="${isAlbum ? "Artistes variés" : "Artiste inconnu"}"></label>`}
+  ${isAlbum || isPl ? "" : html`<label class="field"><span>Album</span><input name="album" value="${album || ""}" maxlength="200" placeholder="Aucun (single)"></label>`}
+  ${isPl ? "" : html`<div class="field-row"><label class="field"><span>Année</span><input name="year" value="${year || ""}" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="2024"></label><label class="field"><span>Genre</span><input name="genre" value="${genre || ""}" maxlength="60" placeholder="Pop, jazz…"></label></div>`}
+  ${isPl ? "" : html`<p class="edit-note">${icon("info", "sm")}<span>Gardé dans aurore : tes fichiers ne sont pas modifiés.</span></p>`}
   <div class="edit-actions">${this.kind === "track" && L.edits[this.id] ? html`<button type="button" class="btn ghost" data-act="edit-undo">Revenir aux infos du fichier</button>` : html`<span></span>`}<button type="submit" class="btn primary">Enregistrer</button></div>
 </form>`);
     const f = $("#edit-form");
@@ -77,8 +78,8 @@ const Edit = {
   async commit(d) {
     const val = (k) => (d.get(k) == null ? null : String(d.get(k)).trim());
     const title = val("title"), artist = val("artist"), album = val("album"), year = cleanYear(val("year")), genre = val("genre");
-    if (!title) return toast("Le titre ne peut pas être vide.");
-    const ids = this.kind === "album" ? (L.albums.get(this.id)?.tracks || []) : [this.id];
+    if (!title) return toast(this.kind === "playlist" ? "Donne un nom à la playlist." : "Le titre ne peut pas être vide.");
+    const ids = this.kind === "album" ? (L.albums.get(this.id)?.tracks || []) : this.kind === "playlist" ? [] : [this.id];
     let artKey = null;
     if (this.pic) {
       const art = await makeArt(await this.croppedBlob()).catch(() => null);
@@ -87,6 +88,13 @@ const Edit = {
       L.art.set(artKey, art); DB.put("art", artKey, { big: art.big, small: art.small, colors: art.colors });
       if (NP && NP.ok) NP.art.delete(artKey);
     } else if (this.dropPic) artKey = "";
+    if (this.kind === "playlist") {
+      const p = L.playlists.find((x) => x.id === this.id); if (!p) return closeSheet();
+      p.name = title; if (artKey !== null) p.artKey = artKey;
+      savePlaylists(); this.reset(); closeSheet(); UI.renderNav(); UI.rerender();
+      if (NP && NP.ok) NP.exportSoon();
+      return toast("Playlist mise à jour.");
+    }
     for (const id of ids) {
       const t = L.tracks.get(id); if (!t) continue;
       const e = (L.edits[id] ||= {});

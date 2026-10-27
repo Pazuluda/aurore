@@ -913,3 +913,8 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 .crop-zoom .ic.sm { width: 13px; height: 13px; }
 .crop-hint { font-size: 12px; color: var(--text-3); }
 @media (max-width: 760px) { .viz-pick span { display: none; } .viz-pick { width: 40px; padding: 0; justify-content: center; } .imm-top .ctx { max-width: 52vw; } }
+/* photo de playlist : la pochette se touche pour la changer */
+.cover-edit { position: relative; padding: 0; border: 0; cursor: pointer; }
+.cover-edit::after { content: "Changer la photo"; position: absolute; inset: auto 8px 8px 8px; padding: 6px 10px; border-radius: 999px; background: rgb(0 0 0 / .62); color: #fff; font: 600 12px var(--f-body); text-align: center; opacity: 0; transform: translateY(4px); transition: opacity var(--t-fast), transform var(--t-fast); backdrop-filter: blur(6px); }
+.cover-edit:hover::after, .cover-edit:focus-visible::after { opacity: 1; transform: none; }
+@media (hover: none) { .cover-edit::after { opacity: 1; transform: none; content: "Photo"; inset: auto 8px 8px auto; } }
