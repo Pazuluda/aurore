@@ -43,9 +43,10 @@ function shelf(title, items, more) {
   return html`<section class="sec"><div class="sec-head"><h2 class="h-sec">${title}</h2>${more ? html`<button class="link" data-act="nav" data-view="${more[0]}">${more[1]}</button>` : ""}</div><div class="shelf">${items}</div></section>`;
 }
 function playlistCard(p) {
-  const arts = [...new Set(p.ids.map((id) => L.tracks.get(id)?.artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
+  const pids = p.smart ? Smart.eval(p.smart, p.id) : p.ids;
+  const arts = [...new Set(pids.map((id) => L.tracks.get(id)?.artKey).filter((k) => k && artSmall(k)))].slice(0, 4);
   const inner = p.artKey && artBig(p.artKey) ? html`<img src="${artBig(p.artKey)}" alt="">` : arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`;
-  return html`<div class="card" data-act="open-list" data-id="${p.id}" role="button" tabindex="0" aria-label="${p.name}"><div class="cover" style="--cc:${placeholderColor(p.name)}">${inner}<button class="card-play" data-act="play-ctx" data-ctx="list:${p.id}" aria-label="Lire ${p.name}">${icon("play")}</button></div><div class="card-title">${p.name}</div><div class="card-sub">${plural(p.ids.length, "titre", "titres")}</div></div>`;
+  return html`<div class="card" data-act="open-list" data-id="${p.id}" role="button" tabindex="0" aria-label="${p.name}"><div class="cover" style="--cc:${placeholderColor(p.name)}">${inner}<button class="card-play" data-act="play-ctx" data-ctx="list:${p.id}" aria-label="Lire ${p.name}">${icon("play")}</button></div><div class="card-title">${p.name}</div><div class="card-sub">${p.smart ? "Intelligente · " : ""}${plural(pids.length, "titre", "titres")}</div></div>`;
 }
 
 /* ---- contextes de lecture ---- */
@@ -85,6 +86,7 @@ function listSpec(id) {
   if (id === "never") return { name: "Jamais écoutés", kind: "Playlist auto", ids: L.sorted.tracks.filter((x) => !playsOf(x)).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)), auto: true, ic: "sparkles", empty: "Tu as tout écouté. Respect." };
   if (id === "recent") { const seen = new Set(), ids = []; for (let i = L.history.length - 1; i >= 0 && ids.length < 50; i--) { const x = L.history[i][0]; if (!seen.has(x) && hasT(x)) { seen.add(x); ids.push(x); } } return { name: "Écoutés récemment", kind: "Playlist auto", ids, auto: true, ic: "clock", empty: "Rien pour l'instant." }; }
   const p = L.playlists.find((x) => x.id === id);
+  if (p && p.smart) return { name: p.name, kind: "Playlist intelligente", ids: Smart.eval(p.smart, p.id), p, smart: true, empty: "Aucun titre ne respecte ces règles pour l'instant : modifie-les avec le bouton ⋯." };
   if (p) return { name: p.name, kind: "Playlist", ids: p.ids.filter(hasT), p, empty: "Ajoute des titres avec le bouton ⋯ à côté de n'importe quel titre, puis « Ajouter à une playlist »." };
   return null;
 }
@@ -128,6 +130,7 @@ const VIEWS = {
     return html`${installCard()}<div class="view-head"><div><h1 class="h-page">${greet}</h1><div class="sub">${plural(L.tracks.size, "titre", "titres")} · ${plural(L.albums.size, "album", "albums")} · ${plural(L.artists.size, "artiste", "artistes")} · ${fmtLong(dur)} de musique</div></div></div>
 <div class="tiles n${nT}">${tiles.slice(0, nT).map((t) => html`<button class="tile" style="--tc:${t.tc}" data-act="${t.act}" ${raw(t.id ? `data-id="${esc(t.id)}"` : "")} ${raw(t.key ? `data-key="${esc(t.key)}"` : "")} ${raw(t.act === "play-ctx" ? `data-ctx="${esc(t.ctx)}"` : "")}><span class="tile-art">${t.art && artSmall(t.art) ? html`<img src="${artSmall(t.art)}" alt="">` : icon(t.ic || "disc")}</span><span class="tile-name">${t.name}</span><span class="mini-play" data-act="play-ctx" data-ctx="${t.ctx}" aria-hidden="true">${icon("play")}</span></button>`)}</div>
 ${shelf("Écouté récemment", recents.map(albumCard))}
+${Recap.available() ? html`<section class="sec"><button class="recap-banner" data-act="recap-open"><span class="rb-ic">${icon("sparkles")}</span><span><b>Ton récap de ${MONTHS[new Date().getMonth()]}</b><small>Tes artistes, tes titres, ton humeur et tes heures d'écoute, en mode story.</small></span>${icon("right", "sm")}</button></section>` : ""}
 ${moodsHTML()}
 ${shelf("Tes playlists", L.playlists.map(playlistCard))}
 ${shelf(tops.length >= 3 ? "Tes artistes du moment" : "Tes artistes", artistKeys.map(artistCard), ["artists", "Tout afficher"])}
@@ -174,7 +177,7 @@ ${genres.length > 1 ? html`<div class="chips" style="margin-top:10px" role="grou
     const allLiked = a.tracks.every((id) => L.likes.has(id));
     const others = a.artist !== "Artistes variés" ? [...(L.artists.get(norm(a.artist))?.albums || [])].filter((k) => k !== key) : [];
     return html`<header class="dhead" style="--hc:${p ? p.c1 : placeholderColor(a.title)}">${coverHTML(a.artKey, a.title)}</div>
-<div class="dhead-meta"><span class="eyebrow">${a.kind}</span><h1 class="dhead-title${a.title.length > 28 ? " long" : ""}">${a.title}</h1>
+<div class="dhead-meta"><span class="eyebrow">${a.kind}</span><h1 class="dhead-title${a.title.length > 22 ? " long" : ""}">${a.title}</h1>
 <div class="dhead-line">${a.artist !== "Artistes variés" ? html`<button data-act="open-artist" data-key="${norm(a.artist)}"><b>${a.artist}</b></button>` : html`<b>Artistes variés</b>`}${a.year ? html`<span class="dot">${a.year}</span>` : ""}<span class="dot">${plural(a.tracks.length, "titre", "titres")}, ${fmtLong(a.duration)}</span>${a.genre ? html`<span class="dot">${a.genre}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire l'album">${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
@@ -193,7 +196,7 @@ ${others.length ? shelf(`Plus de ${a.artist}`, others.map(albumCard)) : ""}`;
     const feat = [...ar.albums].map((k) => L.albums.get(k)).filter((a) => a && norm(a.artist) !== key);
     const showAll = UI.artistAll === key;
     return html`<header class="dhead artist" style="--hc:${p ? p.c1 : placeholderColor(ar.name)}">${coverHTML(ar.artKey, ar.name, "artist")}</div>
-<div class="dhead-meta"><span class="eyebrow">Artiste</span><h1 class="dhead-title${ar.name.length > 24 ? " long" : ""}">${ar.name}</h1>
+<div class="dhead-meta"><span class="eyebrow">Artiste</span><h1 class="dhead-title${ar.name.length > 20 ? " long" : ""}">${ar.name}</h1>
 <div class="dhead-line"><span>${plural(ids.length, "titre", "titres")}</span>${own.length ? html`<span class="dot">${plural(own.length, "album", "albums")}</span>` : ""}${plays ? html`<span class="dot">écouté ${plural(plays, "fois", "fois")}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire ${ar.name}">${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
@@ -214,13 +217,13 @@ ${feat.length ? shelf("Apparaît sur", feat.map((a) => albumCard(a.key))) : ""}`
       : html`<${raw(s.p ? `button class="cover cover-edit" data-act="pl-photo" data-id="${esc(id)}" aria-label="Choisir une photo pour la playlist"` : 'div class="cover"')} style="--cc:${placeholderColor(s.name)}">${arts.length >= 4 ? html`<div class="mosaic">${arts.map((k) => html`<img src="${artSmall(k)}" alt="">`)}</div>` : arts.length ? html`<img src="${artBig(arts[0])}" alt="">` : html`<div class="ph">${icon("music")}</div>`}</${raw(s.p ? "button" : "div")}>`;
     const editing = UI.editing === id;
     return html`<header class="dhead" style="--hc:${s.auto ? "var(--c1)" : placeholderColor(s.name)}">${cover}
-<div class="dhead-meta"><span class="eyebrow">${s.kind}</span>${editing ? html`<h1 class="dhead-title long"><input class="title-input" id="pl-title" value="${s.name}" aria-label="Nom de la playlist" maxlength="80"></h1>` : html`<h1 class="dhead-title${s.name.length > 24 ? " long" : ""}">${s.p ? html`<button data-act="rename-list" data-id="${id}" title="Renommer" style="font:inherit;letter-spacing:inherit;text-align:left">${s.name}</button>` : s.name}</h1>`}
+<div class="dhead-meta"><span class="eyebrow">${s.kind}</span>${editing ? html`<h1 class="dhead-title long"><input class="title-input" id="pl-title" value="${s.name}" aria-label="Nom de la playlist" maxlength="80"></h1>` : html`<h1 class="dhead-title${s.name.length > 20 ? " long" : ""}">${s.p ? html`<button data-act="rename-list" data-id="${id}" title="Renommer" style="font:inherit;letter-spacing:inherit;text-align:left">${s.name}</button>` : s.name}</h1>`}
 <div class="dhead-line"><span>${plural(s.ids.length, "titre", "titres")}</span>${dur ? html`<span class="dot">${fmtLong(dur)}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire" ${raw(s.ids.length ? "" : "disabled")}>${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
 ${s.p ? html`<button class="icon-btn" data-act="list-menu" data-id="${id}" aria-label="Options de la playlist">${icon("more")}</button>` : s.ids.length ? html`<button class="icon-btn" data-act="ctx-menu" data-ctx="${ref}" aria-label="Plus d'options">${icon("more")}</button>` : ""}
 ${UI.confirmDelete === id ? html`<span class="confirm">Supprimer « ${s.name} » ?<button class="btn sm danger" data-act="delete-list" data-id="${id}">Supprimer</button><button class="btn sm ghost" data-act="cancel-delete">Annuler</button></span>` : ""}</div>
-${s.ids.length ? trackList(s.ids, { label: s.name, ref, playlist: s.p ? id : null }) : html`<div class="empty" style="padding-top:30px"><p>${s.empty}</p><button class="btn" data-act="nav" data-view="tracks">Parcourir mes titres</button></div>`}`;
+${s.ids.length ? trackList(s.ids, { label: s.name, ref, playlist: s.p && !s.smart ? id : null }) : html`<div class="empty" style="padding-top:30px"><p>${s.empty}</p><button class="btn" data-act="nav" data-view="tracks">Parcourir mes titres</button></div>`}`;
   },
 
   search(q) {

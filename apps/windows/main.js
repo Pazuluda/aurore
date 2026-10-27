@@ -154,6 +154,15 @@ ipcMain.handle("aurore:open-path", (_e, dir) => {
   if (config.folders.some((d) => norm(d) === norm(dir))) return shell.openPath(dir);
   return "refusé";
 });
+ipcMain.handle("aurore:trash", async (_e, paths) => {
+  let n = 0;
+  for (const p of (paths || []).slice(0, 2000).map(String)) {
+    const abs = path.resolve(p);
+    if (!config.folders.some((d) => inside(abs, d))) continue; // seulement dans tes dossiers de musique
+    try { await shell.trashItem(abs); n++; } catch { /* déjà parti */ }
+  }
+  return n;
+});
 ipcMain.handle("aurore:describe", async (_e, paths) => Promise.all((paths || []).slice(0, 500).map((p) => describe(String(p)))));
 ipcMain.handle("aurore:import", async (_e, paths, mode) => {
   let copied = 0, linked = 0;

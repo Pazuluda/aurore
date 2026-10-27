@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("auroreNative", {
   describe: (paths) => ipcRenderer.invoke("aurore:describe", Array.from(paths || [], String)),
   importPaths: (paths, mode) => ipcRenderer.invoke("aurore:import", Array.from(paths || [], String), mode === "link" ? "link" : "copy"),
   scan: () => ipcRenderer.invoke("aurore:scan"),
+  trash: (paths) => ipcRenderer.invoke("aurore:trash", Array.from(paths || [], String)),
   read: (abs, start, end) => ipcRenderer.invoke("aurore:read", String(abs), Number(start), Number(end)),
   onChanged: (cb) => ipcRenderer.on("aurore:changed", () => cb()),
   update: {

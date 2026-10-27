@@ -34,7 +34,7 @@ const Sync = {
     const ids = new Set();
     for (const p of L.playlists) {
       ids.add(p.id);
-      const fps = this.playlistFps(p), sig = p.name + "§" + fps.join("¤");
+      const fps = this.playlistFps(p), sig = p.name + "§" + fps.join("¤") + (p.smart ? JSON.stringify(p.smart) : "");
       if (st.pls[p.id] !== sig) { st.pls[p.id] = sig; p.updated = now; p.fps = fps; }
     }
     for (const id of Object.keys(st.pls)) if (!ids.has(id)) { delete st.pls[id]; st.deleted[id] = now; }
@@ -50,7 +50,7 @@ const Sync = {
     this.stamp();
     const st = this.state(), stats = {};
     for (const [id, s] of Object.entries(L.stats)) { const t = L.tracks.get(id); if (t && !t.demo && (s.p || s.ms)) { const fp = fpOf(t); const v = (stats[fp] ||= [0, 0]); v[0] += s.p || 0; v[1] += Math.round((s.ms || 0) / 1000); } }
-    return { v: 1, device: this.device(), name: IS_MOBILE ? "téléphone" : "PC", likes: st.likeLog, playlists: L.playlists.map((p) => ({ id: p.id, name: p.name, fps: p.fps || this.playlistFps(p), created: p.created || 0, updated: p.updated || 0 })), deleted: st.deleted, stats };
+    return { v: 1, device: this.device(), name: IS_MOBILE ? "téléphone" : "PC", likes: st.likeLog, playlists: L.playlists.map((p) => ({ id: p.id, name: p.name, fps: p.smart ? [] : p.fps || this.playlistFps(p), smart: p.smart || null, created: p.created || 0, updated: p.updated || 0 })), deleted: st.deleted, stats };
   },
   merge(r) {
     if (!r || r.v !== 1) return { likes: 0, playlists: 0 };
@@ -70,8 +70,8 @@ const Sync = {
     for (const rp of r.playlists || []) {
       if ((st.deleted[rp.id] || 0) >= rp.updated) continue;
       let p = L.playlists.find((x) => x.id === rp.id);
-      if (!p) { p = { id: rp.id, name: rp.name, ids: toIds(rp.fps), fps: rp.fps, created: rp.created || Date.now(), updated: rp.updated }; L.playlists.push(p); np++; }
-      else if ((rp.updated || 0) > (p.updated || 0)) { p.name = rp.name; p.ids = toIds(rp.fps); p.fps = rp.fps; p.updated = rp.updated; np++; }
+      if (!p) { p = { id: rp.id, name: rp.name, ids: toIds(rp.fps), fps: rp.fps, created: rp.created || Date.now(), updated: rp.updated }; if (rp.smart) p.smart = rp.smart; L.playlists.push(p); np++; }
+      else if ((rp.updated || 0) > (p.updated || 0)) { p.name = rp.name; p.ids = toIds(rp.fps); p.fps = rp.fps; p.updated = rp.updated; if (rp.smart) p.smart = rp.smart; np++; }
       else continue;
       st.pls[p.id] = p.name + "§" + this.playlistFps(p).join("¤");
     }

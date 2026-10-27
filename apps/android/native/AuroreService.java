@@ -111,6 +111,30 @@ public class AuroreService extends MediaLibraryService {
         AuroreWidget.refresh(this);
     }
 
+    /* boucle A-B : on revient au point A dès qu'on dépasse le point B */
+    private final android.os.Handler loopHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private long loopA = -1, loopB = -1;
+    private String loopId = null;
+    private final Runnable loopTick = new Runnable() {
+        @Override
+        public void run() {
+            if (loopB < 0 || player == null) return;
+            MediaItem m = player.getCurrentMediaItem();
+            if (m == null || !m.mediaId.equals(loopId)) { loopA = loopB = -1; return; }
+            long pos = player.getCurrentPosition();
+            if (pos >= loopB || pos < loopA - 1000) player.seekTo(loopA);
+            loopHandler.postDelayed(this, 40);
+        }
+    };
+
+    void setLoop(long a, long b) {
+        loopHandler.removeCallbacks(loopTick);
+        MediaItem m = player != null ? player.getCurrentMediaItem() : null;
+        if (a < 0 || b <= a || m == null) { loopA = loopB = -1; loopId = null; return; }
+        loopA = a; loopB = b; loopId = m.mediaId;
+        loopHandler.post(loopTick);
+    }
+
     @Override
     public MediaLibrarySession onGetSession(MediaSession.ControllerInfo controllerInfo) {
         return session;

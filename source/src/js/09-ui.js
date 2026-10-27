@@ -183,6 +183,7 @@ const UI = {
     if (Menu.isOpen) Menu.close();
     if (!$("#sheet").hidden) { $("#sheet").hidden = true; $("#sheet").innerHTML = ""; return; }
     if (!$("#guide").hidden) return Guide.close(true);
+    if (!$("#recap").hidden) return Recap.close(true);
     if (this.imm) return this.closeImm(true);
     if (this.stack.length) this.back(true);
   },
@@ -233,7 +234,7 @@ const UI = {
       ["saved", "À découvrir", `${L.saved.length} artistes notés`, "bookmark", "saved"],
     ];
     setHTML($("#side-lists"), html`${special.map(([id, name, sub, ic, cls]) => html`<button class="pl-item" data-act="${id === "saved" ? "nav" : "open-list"}" data-view="discover" data-id="${id}" ${raw((cur === "list" && pv === id) ? 'aria-current="page"' : "")}><span class="pl-thumb ${cls}">${icon(ic, "sm")}</span><span class="pl-meta"><span class="pl-name" style="display:block">${name}</span><span class="pl-sub">${sub}</span></span></button>`)}
-${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).find((t) => t && artSmall(t.artKey)); return html`<button class="pl-item" data-act="open-list" data-id="${p.id}" ${raw(cur === "list" && pv === p.id ? 'aria-current="page"' : "")}><span class="pl-thumb">${p.artKey && artSmall(p.artKey) ? html`<img src="${artSmall(p.artKey)}" alt="">` : first ? html`<img src="${artSmall(first.artKey)}" alt="">` : icon("music", "sm")}</span><span class="pl-meta"><span class="pl-name" style="display:block">${p.name}</span><span class="pl-sub">Playlist · ${plural(p.ids.length, "titre", "titres")}</span></span></button>`; })}`);
+${L.playlists.map((p) => { const pids = p.smart ? Smart.eval(p.smart, p.id) : p.ids; const first = pids.map((id) => L.tracks.get(id)).find((t) => t && artSmall(t.artKey)); return html`<button class="pl-item" data-act="open-list" data-id="${p.id}" ${raw(cur === "list" && pv === p.id ? 'aria-current="page"' : "")}><span class="pl-thumb">${p.artKey && artSmall(p.artKey) ? html`<img src="${artSmall(p.artKey)}" alt="">` : first ? html`<img src="${artSmall(first.artKey)}" alt="">` : icon("music", "sm")}</span><span class="pl-meta"><span class="pl-name" style="display:block">${p.name}</span><span class="pl-sub">${p.smart ? "Intelligente" : "Playlist"} · ${plural(pids.length, "titre", "titres")}</span></span></button>`; })}`);
   },
   onLibraryProgress() {
     const el = $("#lib-status"); if (!el) return;
@@ -468,11 +469,13 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
     <button class="icon-btn" data-act="next" aria-label="Suivant">${icon("next", "lg")}</button>
     <button class="icon-btn js-repeat" data-act="repeat" aria-label="Répéter">${icon("repeat")}</button>
   </div>
+  <div class="imm-extra"><button class="pill js-ab" data-act="ab" aria-pressed="false" title="Boucle A-B : répéter un passage">A-B</button><button class="pill" data-act="card-open" title="Créer une image à partager">${icon("send", "sm")} Carte « J'écoute »</button></div>
 </div>
 <div class="imm-queue" ${raw(this.immQueue ? "" : "hidden")}></div>`);
     Viz.add(el.querySelector("canvas"), "imm");
     Viz.particles.length = 0;
     if (this.immQueue) this.renderImmQueue();
+    AB.sync();
     this.syncControls(); this.syncTime(); Viz.kick();
   },
   async keepAwake(on) {

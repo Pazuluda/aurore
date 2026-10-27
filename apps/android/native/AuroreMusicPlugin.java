@@ -378,6 +378,88 @@ public class AuroreMusicPlugin extends Plugin {
         call.resolve();
     }
 
+    /* ---- fichiers : sauvegarde, images à partager ---- */
+
+    /** enregistre un fichier dans Téléchargements (ou Images › aurore pour une image) */
+    @PluginMethod
+    public void saveFile(final PluginCall call) {
+        final String name = call.getString("name", "aurore.json").replaceAll("[\\/:*?\"<>|]", "_");
+        final String mime = call.getString("mime", "application/octet-stream");
+        final String data = call.getString("data", "");
+        final boolean image = call.getBoolean("images", false);
+        if (Build.VERSION.SDK_INT < 29) {
+            call.reject("Android 10 minimum", "ANDROID_9");
+            return;
+        }
+        new Thread(() -> {
+            ContentResolver cr = getContext().getContentResolver();
+            Uri item = null;
+            try {
+                byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+                v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
+                v.put(MediaStore.MediaColumns.RELATIVE_PATH, image ? "Pictures/aurore" : "Download");
+                v.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                Uri col = image ? MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY) : MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+                item = cr.insert(col, v);
+                if (item == null) throw new IOException("MediaStore");
+                try (java.io.OutputStream o = cr.openOutputStream(item)) {
+                    if (o == null) throw new IOException("écriture");
+                    o.write(bytes);
+                }
+                android.content.ContentValues done = new android.content.ContentValues();
+                done.put(MediaStore.MediaColumns.IS_PENDING, 0);
+                cr.update(item, done, null, null);
+                call.resolve();
+            } catch (Exception e) {
+                if (item != null) try { cr.delete(item, null, null); } catch (Exception ignored) { /* rien */ }
+                call.reject("Enregistrement impossible", "SAVE");
+            }
+        }, "aurore-fichier").start();
+    }
+
+    /** ouvre le menu Partager d'Android avec un fichier (image de la carte « J'écoute ») */
+    @PluginMethod
+    public void shareFile(final PluginCall call) {
+        try {
+            String name = call.getString("name", "aurore.png").replaceAll("[\\/:*?\"<>|]", "_");
+            byte[] bytes = Base64.decode(call.getString("data", ""), Base64.DEFAULT);
+            File dir = new File(getContext().getCacheDir(), "share");
+            if (!dir.exists()) dir.mkdirs();
+            File[] old = dir.listFiles();
+            if (old != null) for (File f : old) f.delete();
+            File f = new File(dir, name);
+            try (FileOutputStream out = new FileOutputStream(f)) {
+                out.write(bytes);
+            }
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", f);
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType(call.getString("mime", "image/png"));
+            send.putExtra(Intent.EXTRA_STREAM, uri);
+            String text = call.getString("text", "");
+            if (!text.isEmpty()) send.putExtra(Intent.EXTRA_TEXT, text);
+            send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent chooser = Intent.createChooser(send, "Partager");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getContext().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Partage impossible", "SHARE");
+        }
+    }
+
+    /** boucle A-B, tenue par le service (marche aussi écran éteint) ; a < 0 pour arrêter */
+    @PluginMethod
+    public void pab(final PluginCall call) {
+        final long a = (long) (double) call.getDouble("a", -1.0), b = (long) (double) call.getDouble("b", -1.0);
+        withPlayer(call, (p) -> {
+            AuroreService s = AuroreService.instance;
+            if (s != null) s.setLoop(a, b);
+            call.resolve();
+        });
+    }
+
     /* ---- lien Wi-Fi avec aurore sur le PC ---- */
 
     /** cherche aurore sur le réseau de la maison (message envoyé à tout le réseau, réponses pendant 2 s) */

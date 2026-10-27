@@ -6,7 +6,7 @@ const L = {
   tracks: new Map(), files: new Map(), art: new Map(),
   albums: new Map(), artists: new Map(), genres: [],
   sorted: { tracks: [], albums: [], artists: [] },
-  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [], edits: {},
+  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [], edits: {}, hidden: new Set(),
   memorize: false, rootName: "", importing: null, memorizing: null, dirHandle: null,
   version: 0,
 };
@@ -206,7 +206,8 @@ async function loadLibrary() {
   for (const [k, a] of arts) L.art.set(k, a);
   const K = Object.fromEntries(kv);
   L.stats = K.stats || {}; L.likes = new Set(K.likes || []); L.playlists = K.playlists || [];
-  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K); L.syncState = K.syncState || null; L.peers = K.peers || {};
+  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K); L.hidden = new Set(K.hidden || []); L.syncState = K.syncState || null; L.peers = K.peers || {};
+  for (const id of L.hidden) L.tracks.delete(id);
   L.memorize = !!K.memorize; L.rootName = K.root || ""; L.dirHandle = K.dirHandle || null;
   if (L.memorize) for (const [id, blob] of await DB.all("files")) if (L.tracks.has(id)) L.files.set(id, blob);
   rebuildIndex();
@@ -238,6 +239,7 @@ async function importEntries(entries, opts = {}) {
   const todo = []; let attached = 0;
   for (const e of audio) {
     const id = "t" + hash(e.path + "|" + e.file.size);
+    if (L.hidden.has(id)) continue;
     if (L.tracks.has(id)) { L.files.set(id, e.file); attached++; } else todo.push({ ...e, id });
   }
   L.importing = { done: 0, total: todo.length, attached };

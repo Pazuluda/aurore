@@ -31,7 +31,8 @@ function addToPlaylist(p, ids) {
   if (UI.view.name === "list" && UI.view.param === p.id) UI.rerender();
 }
 function playlistSub(ids) {
-  return () => [{ title: "Ajouter à…" }, { icon: "plus", label: "Nouvelle playlist", fn: () => { const p = newPlaylist(ids, false); toast(`Playlist « ${p.name} » créée.`, { action: { label: "Ouvrir", fn: () => UI.go("list", p.id) } }); } }, ...(L.playlists.length ? ["sep"] : []), ...L.playlists.map((p) => ({ icon: "music", label: p.name, fn: () => addToPlaylist(p, ids) }))];
+  const pls = L.playlists.filter((p) => !p.smart);
+  return () => [{ title: "Ajouter à…" }, { icon: "plus", label: "Nouvelle playlist", fn: () => { const p = newPlaylist(ids, false); toast(`Playlist « ${p.name} » créée.`, { action: { label: "Ouvrir", fn: () => UI.go("list", p.id) } }); } }, ...(pls.length ? ["sep"] : []), ...pls.map((p) => ({ icon: "music", label: p.name, fn: () => addToPlaylist(p, ids) }))];
 }
 /* envoyer plusieurs titres d'un coup (album, playlist, artiste, humeur…) */
 function sendItems(ids) {
@@ -54,6 +55,7 @@ function trackMenu(at, id, list) {
   items.push({ icon: "sparkles", label: "Artistes proches", fn: () => discoverFrom(t.artists[0]) });
   if (LanPC && LanPC.hasPhone && L.files.get(id)?.abs) items.push({ icon: "send", label: "Envoyer au téléphone", fn: () => LanPC.send([id]) });
   if (LanPhone && LanPhone.pc && L.files.get(id)?.media) items.push({ icon: "send", label: `Envoyer au PC`, fn: () => LanPhone.send([id]) });
+  items.push({ icon: "image", label: "Carte « J'écoute »", fn: () => Card.open(id) });
   items.push("sep", { icon: "pencil", label: "Modifier les infos", fn: () => Edit.openTrack(id) });
   if (list && list.opts.playlist) { const p = L.playlists.find((x) => x.id === list.opts.playlist); if (p) items.push("sep", { icon: "trash", label: "Retirer de cette playlist", fn: () => { p.ids = p.ids.filter((x) => x !== id); savePlaylists(); UI.renderNav(); UI.rerender(); toast("Retiré de la playlist."); } }); }
   Menu.open(at, items);
@@ -117,10 +119,31 @@ const ACTIONS = {
   "q-remove": (el) => { Q.manual.splice(+el.dataset.i, 1); UI.onQueueChanged(); },
   "q-clear": () => { Q.manual = []; UI.onQueueChanged(); },
   noop: () => {},
-  "new-playlist": () => newPlaylist(),
+  "new-playlist": (el) => Menu.open(el, [{ icon: "plus", label: "Nouvelle playlist", fn: () => newPlaylist() }, { icon: "sparkles", label: "Playlist intelligente…", fn: () => Smart.open() }]),
+  "dup-open": () => Dupes.open(),
+  "dup-hide": () => { const c = Dupes.chosen(); closeSheet(); Dupes.apply(c, false); },
+  "dup-trash": () => { const c = Dupes.chosen(); closeSheet(); Dupes.apply(c, true); },
+  "dup-restore": () => Dupes.restore(),
+  "sm-match": (el) => { Smart.draft.match = el.dataset.v; Smart.render(); },
+  "sm-add": () => { Smart.draft.rules.push({ f: "liked" }); Smart.render(); },
+  "sm-del": (el) => { Smart.draft.rules.splice(+el.dataset.i, 1); Smart.render(); },
+  "sm-save": () => Smart.save(),
+  ab: () => AB.press(),
+  "card-open": () => Card.open(),
+  "card-share": () => Card.share(),
+  "card-copy": () => Card.copy(),
+  "card-save": () => Card.save(),
+  "backup-export": () => Backup.export(),
+  "backup-import": () => Backup.pick(),
+  "recap-open": () => Recap.open(),
+  "rc-close": () => Recap.close(),
+  "rc-next": () => Recap.go(1),
+  "rc-prev": () => Recap.go(-1),
+  "rc-period": (el) => { Recap.period = el.dataset.v; Recap.build(); Recap.i = 0; Recap.show(); },
+  "rc-share": () => Recap.share(),
   "rename-list": (el) => { UI.editing = el.dataset.id; UI.render(); const i = $("#pl-title"); if (i) { i.focus(); i.select(); } },
   "pl-photo": (el) => Edit.openPlaylist(el.dataset.id),
-  "list-menu": (el) => { const id = el.dataset.id; Menu.open(el, [{ icon: "pencil", label: "Renommer", fn: () => ACTIONS["rename-list"]({ dataset: { id } }) }, { icon: "image", label: "Changer la photo", fn: () => Edit.openPlaylist(id) }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { const s = listSpec(id); Q.addEnd(s.ids); toast("Ajouté à la file d'attente."); } }, ...sendItems(listSpec(id).ids), "sep", { icon: "trash", label: "Supprimer la playlist", fn: () => { UI.confirmDelete = id; UI.rerender(); } }]); },
+  "list-menu": (el) => { const id = el.dataset.id; const pl = L.playlists.find((x) => x.id === id); Menu.open(el, [...(pl && pl.smart ? [{ icon: "sparkles", label: "Modifier les règles", fn: () => Smart.open(id) }] : []), { icon: "pencil", label: "Renommer", fn: () => ACTIONS["rename-list"]({ dataset: { id } }) }, { icon: "image", label: "Changer la photo", fn: () => Edit.openPlaylist(id) }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { const s = listSpec(id); Q.addEnd(s.ids); toast("Ajouté à la file d'attente."); } }, ...sendItems(listSpec(id).ids), "sep", { icon: "trash", label: "Supprimer la playlist", fn: () => { UI.confirmDelete = id; UI.rerender(); } }]); },
   "delete-list": (el) => { const id = el.dataset.id; const p = L.playlists.find((x) => x.id === id); L.playlists = L.playlists.filter((x) => x.id !== id); savePlaylists(); UI.confirmDelete = null; UI.stack = []; UI.go("home", null, { push: false }); toast(`Playlist « ${p ? p.name : ""} » supprimée.`, { action: { label: "Annuler", fn: () => { if (p) { L.playlists.push(p); savePlaylists(); UI.renderNav(); } } } }); },
   "cancel-delete": () => { UI.confirmDelete = null; UI.rerender(); },
   "disc-run": (el) => Disc.run(el.dataset.fresh === "1"),
@@ -216,6 +239,8 @@ ${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div sty
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${String(L.memorize)}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
 <div class="set-row"><div><b>Égaliseur</b><p>${Fx.eqOn ? `Activé : ${(EQ_PRESETS.find((p) => p[0] === Fx.preset) || ["", "Perso"])[1]}.` : "Désactivé."} Basses, voix, aigus… sur 6 bandes.</p></div><button class="btn sm" data-act="eq-open">${icon("eq", "sm")} Régler</button></div>
 <div class="set-row"><div><b>Volume égalisé</b><p>Tous les titres au même volume, plus de sursaut d'un morceau à l'autre. <span id="an-status">${anStatus()}</span></p></div><button class="switch" role="switch" aria-checked="${String(Fx.norm)}" data-act="set-norm" aria-label="Volume égalisé"></button></div>
+<div class="set-row"><div><b>Titres en double</b><p>aurore repère les doublons et garde la meilleure qualité.${L.hidden.size ? ` ${plural(L.hidden.size, "titre masqué", "titres masqués")}.` : ""}</p></div><button class="btn sm" data-act="dup-open">${icon("search", "sm")} Chercher</button></div>
+<div class="set-row"><div><b>Sauvegarde</b><p>Playlists, likes, statistiques, modifications et réglages dans un fichier, pour les retrouver sur un autre appareil ou après une réinstallation.</p></div><span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn sm" data-act="backup-export">${icon("download", "sm")} Exporter</button><button class="btn sm ghost" data-act="backup-import">Importer</button></span></div>
 <div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${String(Viz.calm)}" data-act="set-calm" aria-label="Animations douces"></button></div>
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
@@ -285,7 +310,7 @@ function bindEvents() {
   });
   document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName; const typing = tag === "INPUT" && e.target.type !== "range" || tag === "TEXTAREA" || e.target.isContentEditable;
-    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#guide").hidden) return Guide.close(); if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
+    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#guide").hidden) return Guide.close(); if (!$("#recap").hidden) return; if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
     if (e.target.id === "pl-title" && e.key === "Enter") { e.target.blur(); return; }
     if (typing) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role='button'][data-act]")) { e.preventDefault(); e.target.click(); return; }
@@ -359,7 +384,7 @@ function bindEvents() {
   });
 
   // lecteur
-  Player.on("track", (id) => { UI.setTrackInfo(id); UI.refreshRows(); UI.syncTime(); });
+  Player.on("track", (id) => { if (AB.id && AB.id !== id) AB.clear(); UI.setTrackInfo(id); UI.refreshRows(); UI.syncTime(); });
   Player.on("state", () => { UI.syncControls(); UI.refreshRows(); if (Player.playing) { UI.progressLoop(); Viz.kick(); } UI.syncTime(); });
   Player.on("meta", () => UI.syncTime());
   Player.on("seek", () => { UI.syncTime(); if (Q.session) Q.session.last = null; });
@@ -437,5 +462,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit, LanPC, LanPhone };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit, LanPC, LanPhone, Dupes, Smart, AB, Backup, Card, Recap };
 boot();
