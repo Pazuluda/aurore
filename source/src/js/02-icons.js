@@ -1,5 +1,6 @@
 /* ===================== icônes (tracés style Lucide) ===================== */
 const ICONS = {
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><circle cx="17" cy="6" r="2"/>',
   burst: '<path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.9 4.9 2.8 2.8"/><path d="m16.3 16.3 2.8 2.8"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.9 19.1 2.8-2.8"/><path d="m16.3 7.7 2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
   retro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15v-3"/><path d="M9 15V9"/><path d="M12 15v-5"/><path d="M15 15v-2"/><path d="M18 15V8"/>',

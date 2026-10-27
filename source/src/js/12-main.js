@@ -6,6 +6,7 @@ function playRow(c) {
   Q.playList(c.list.ids, c.i, c.list.opts.label || "", c.list.opts.ref || null);
 }
 function toggleLike(id) {
+  if (NP && NP.ok) NP.exportSoon();
   if (!id) return;
   if (L.likes.has(id)) { L.likes.delete(id); toast("Retiré des titres likés."); }
   else { L.likes.add(id); toast("Ajouté aux titres likés."); }
@@ -122,6 +123,11 @@ const ACTIONS = {
   "close-sheet": () => closeSheet(),
   "set-memo": () => { L.memorize = !L.memorize; DB.put("kv", "memorize", L.memorize); store.set("askedMemo", true); if (L.memorize) { memorizeFiles(); toast("Ta musique sera gardée dans le lecteur."); } else { forgetFiles(); toast("Copie supprimée. Ton dossier reste la source."); } openSettings(); UI.onLibraryProgress(); },
   "set-calm": () => { setCalm(!Viz.calm); openSettings(); },
+  "auto-guide": () => { closeSheet(); Guide.open(0); },
+  "guide-close": () => Guide.close(),
+  "guide-next": () => Guide.go(1),
+  "guide-prev": () => Guide.go(-1),
+  "guide-open-auto": () => Guide.openAuto(),
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -183,6 +189,7 @@ ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le l
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
 ${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
+${CAP ? html`<div class="set-row"><div><b>Android Auto</b><p>Retrouve tes playlists, albums et artistes sur l'écran de ta voiture. Un réglage à faire une seule fois, montré pas à pas.</p></div><button class="btn sm primary" data-act="auto-guide">${icon("car", "sm")} Voir le guide</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b><p>La même app, sans navigateur : installateur pour ton PC et APK pour ton téléphone.</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`}
 ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
@@ -221,7 +228,7 @@ function bindEvents() {
   });
   document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName; const typing = tag === "INPUT" && e.target.type !== "range" || tag === "TEXTAREA" || e.target.isContentEditable;
-    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
+    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#guide").hidden) return Guide.close(); if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
     if (e.target.id === "pl-title" && e.key === "Enter") { e.target.blur(); return; }
     if (typing) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role='button'][data-act]")) { e.preventDefault(); e.target.click(); return; }
@@ -370,5 +377,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide };
 boot();

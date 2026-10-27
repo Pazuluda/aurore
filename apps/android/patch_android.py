@@ -20,10 +20,24 @@ if "AuroreService" not in s:
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
-    </application>""", 1)
+        <!-- pochettes lisibles par Android Auto -->
+        <provider
+            android:name=".ArtProvider"
+            android:authorities="io.github.pazuluda.aurore.art"
+            android:exported="true" />
+        <!-- aurore apparaît dans Android Auto -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+    </application>
+    <queries>
+        <package android:name="com.google.android.projection.gearhead" />
+    </queries>""", 1)
 man.write_text(s)
 
 # module maison : musique du téléphone (MediaStore) + serveur de fichiers avec plages d'octets

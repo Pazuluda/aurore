@@ -182,6 +182,7 @@ const UI = {
     this.histDepth = Math.max(0, this.histDepth - 1);
     if (Menu.isOpen) Menu.close();
     if (!$("#sheet").hidden) { $("#sheet").hidden = true; $("#sheet").innerHTML = ""; return; }
+    if (!$("#guide").hidden) return Guide.close(true);
     if (this.imm) return this.closeImm(true);
     if (this.stack.length) this.back(true);
   },

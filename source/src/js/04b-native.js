@@ -140,6 +140,7 @@ const AndroidMusic = CAP ? {
       this.busy = false;
       UI.renderNav(); if (UI.view.name === "home") UI.rerender();
       if (NP && Player.mode === "native") NP.refreshSoon();
+      if (NP && NP.ok) NP.exportSoon();
       if (this.again) { this.again = false; setTimeout(() => this.scan({ quiet: true }), 500); }
     }
   },
@@ -152,7 +153,7 @@ const NV = { native: true, fftSize: 4096, frequencyBinCount: 2048, waveLength: 5
 const blobB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => res(""); r.readAsDataURL(blob); });
 const NP = CAP ? {
   ok: false, st: null, gen: 0, win: [], cur: 0, loaded: false, pending: null, lastState: 0, vizOn: false, vol: -1, art: new Set(), artQ: Promise.resolve(),
-  call(m, o) { return CAP.nativePromise("AuroreMusic", m, o || {}); },
+  call(m, o) { try { return CAP.nativePromise("AuroreMusic", m, o || {}); } catch (e) { return Promise.reject(e); } },
   newGen() { let g = Date.now() % 2000000000; if (g === this.gen) g++; return g; },
   /* au démarrage : branche les évènements ; si le service jouait déjà (app rouverte), on reprend où il en est */
   async boot() {
@@ -161,11 +162,44 @@ const NP = CAP ? {
     if (!s || typeof s.count !== "number") return;
     this.ok = true;
     try {
-      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (d && d.gen === this.gen) this.apply(d, true); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (!d) return; if (d.gen === this.gen) this.apply(d, true); else if (d.gen < 0 && d.count > 0) this.external(); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "external" }, () => this.external());
       CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
     } catch { /* ancienne version */ }
-    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); });
-    if (s.count > 0 && s.id && L.tracks.has(s.id)) this.adopt(s);
+    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); else this.exportLibrary(); });
+    if (s.count > 0 && s.id && L.tracks.has(s.id)) { if (s.gen < 0 && (store.get("nwin", null) || {}).gen !== s.gen) this.takeOver(s); else this.adopt(s); }
+  },
+  /* Android Auto a lancé une liste : l'app la reprend telle quelle */
+  async external() {
+    if (this._ext) return; this._ext = true;
+    try { const s = await this.call("pstate", { start: false }); if (s.gen < 0 && s.gen !== this.gen && s.count > 0) this.takeOver(s); }
+    catch { /* rien */ } finally { this._ext = false; }
+  },
+  takeOver(s) {
+    const ids = s.ids || [];
+    Q.flushSession();
+    Q.ctx = ids.slice(); Q.order = [...ids.keys()]; Q.pos = s.index; Q.manual = []; Q.label = "Android Auto"; Q.ref = null; Q.fromManual = false; Q.current = null;
+    store.set("nwin", { gen: s.gen, cur: s.index, items: ids.map((id, i) => ({ id, src: "o", p: i })) });
+    this.adopt(s); UI.onQueueChanged();
+  },
+  /* résumé de la bibliothèque pour Android Auto */
+  exportSoon: debounce(() => NP.exportLibrary(), 3000),
+  exportLibrary() {
+    if (!this.ok) return;
+    const media = (id) => !!L.files.get(id)?.media && L.tracks.has(id);
+    const art = (k) => (k && L.art.get(k)?.big ? k : "");
+    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey)]; });
+    if (!tracks.length) return;
+    const albums = L.sorted.albums.map((k) => L.albums.get(k)).filter((a) => a && !a.demo).map((a) => [a.key, a.title, a.artist || "", art(a.artKey), a.tracks.filter(media)]).filter((a) => a[4].length);
+    const artists = L.sorted.artists.map((k) => L.artists.get(k)).filter(Boolean).map((a) => { const ids = a.tracks.filter(media); return [a.key, a.name, plural(ids.length, "titre", "titres"), art(a.artKey), ids]; }).filter((a) => a[4].length);
+    const playlists = L.playlists.map((p) => [p.id, p.name, plural(p.ids.length, "titre", "titres"), "", p.ids.filter(media)]).filter((p) => p[4].length);
+    const recent = L.sorted.tracks.filter(media).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)).slice(0, 100);
+    const json = JSON.stringify({ v: 1, tracks, albums, artists, playlists, likes: [...L.likes].filter(media), top: topTracks(50).filter(media), recent });
+    if (json === this._lastExport) return;
+    this._lastExport = json;
+    this.call("plibrary", { json }).catch(() => {});
+    /* pochettes des albums, pour les afficher dans la voiture */
+    this.ensureArt(albums.map((a) => a[4][0]), 600000);
   },
   adopt(s) {
     const saved = store.get("nwin", null), same = saved && saved.gen === s.gen && Array.isArray(saved.items);

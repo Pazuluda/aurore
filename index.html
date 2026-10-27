@@ -749,6 +749,79 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 @media (max-width: 760px) { #dock { touch-action: none; } #view .row { touch-action: pan-y; } }
 :root.th-clair .viz-box, :root.th-clair .d-lcd { background: rgb(var(--hl) / .05); }
 
+/* ---------- guide illustré (Android Auto) ---------- */
+.guide { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgb(0 0 0 / .6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); opacity: 0; transition: opacity 220ms var(--ease-out); }
+.guide.open { opacity: 1; }
+.g-card { position: relative; width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: 26px; padding: 18px 20px 16px; background: radial-gradient(120% 70% at 50% -10%, color-mix(in srgb, var(--c1) 22%, transparent), transparent 70%), var(--ink-1); border: 1px solid var(--line-2); box-shadow: 0 40px 90px -30px rgb(0 0 0 / .8); display: flex; flex-direction: column; gap: 14px; }
+.g-top { display: flex; align-items: center; gap: 10px; }
+.g-kicker { display: inline-flex; align-items: center; gap: 6px; font: 700 11px/1 var(--f-body); letter-spacing: .14em; text-transform: uppercase; color: var(--c2); }
+.g-step { margin-left: auto; font: 500 12px var(--f-mono); color: var(--text-3); }
+.g-progress { display: grid; grid-auto-flow: column; gap: 6px; }
+.g-progress i { height: 4px; border-radius: 4px; background: rgb(var(--hl) / .1); overflow: hidden; position: relative; }
+.g-progress i.done { background: var(--c1); }
+.g-progress i.on { background: linear-gradient(90deg, var(--c1), var(--c2)); }
+.g-stage { height: 300px; display: grid; place-items: center; position: relative; border-radius: 20px; background: radial-gradient(60% 60% at 50% 55%, color-mix(in srgb, var(--c2) 14%, transparent), transparent 75%); animation: g-in 380ms var(--ease-out); }
+.g-stage.from-left { animation-name: g-in-l; }
+@keyframes g-in { from { opacity: 0; transform: translateX(28px); } }
+@keyframes g-in-l { from { opacity: 0; transform: translateX(-28px); } }
+.g-text h2 { margin: 0; font: 800 clamp(20px, 5vw, 24px)/1.15 var(--f-display); letter-spacing: -.02em; }
+.g-text p { margin: 8px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.5; }
+.g-how { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--c1) 12%, transparent); border: 1px solid color-mix(in srgb, var(--c1) 30%, transparent); color: var(--text) !important; }
+.g-how .ic { flex: none; margin-top: 2px; color: var(--c1); }
+.g-open { justify-content: center; min-height: 48px; }
+.g-nav { display: flex; justify-content: space-between; gap: 10px; }
+.g-nav .btn { min-height: 48px; padding: 0 18px; }
+.g-nav .btn[disabled] { opacity: .35; pointer-events: none; }
+.g-note { margin: 0; text-align: center; font-size: 12px; color: var(--text-3); }
+/* téléphone dessiné */
+.g-phone { width: 200px; height: 296px; border-radius: 30px; padding: 7px; background: linear-gradient(160deg, #3a3760, #15142a); box-shadow: 0 30px 60px -24px rgb(0 0 0 / .9), inset 0 0 0 1px rgb(255 255 255 / .12); transform: rotate(-2deg); }
+.g-screen { position: relative; height: 100%; border-radius: 24px; overflow: hidden; background: #f3f2f7; color: #1b1a22; font: 500 10.5px/1.25 var(--f-body); padding-top: 14px; }
+.g-screen::before { content: ""; position: absolute; top: 5px; left: 50%; width: 9px; height: 9px; border-radius: 50%; background: #111; transform: translateX(-50%); }
+.g-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; }
+.g-bar b { flex: 1; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-bar .ic { width: 12px; height: 12px; }
+.g-dots { font-size: 15px; font-weight: 800; padding: 0 4px; border-radius: 8px; }
+.g-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 8px; padding: 8px 6px; border-bottom: 1px solid #e3e1ea; position: relative; }
+.g-row small { color: #6c6a78; font-size: 9.5px; }
+.g-row span small { display: block; margin-top: 2px; }
+.g-sec { margin: 8px 14px 2px; font-size: 9px; font-weight: 700; color: #4b5bd7; letter-spacing: .04em; }
+.g-apphead { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 0 6px; }
+.g-appic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #4285f4, #34a0a4); color: #fff; }
+.g-apphead b { font-size: 12px; } .g-apphead small { color: #6c6a78; font-size: 9px; }
+.g-btns { display: flex; gap: 6px; justify-content: center; margin-bottom: 4px; }
+.g-btns span { padding: 4px 8px; border-radius: 999px; border: 1px solid #c9c6d6; font-size: 9px; }
+.g-check .g-box { width: 16px; height: 16px; border-radius: 4px; background: #4b5bd7; color: #fff; display: grid; place-items: center; flex: none; }
+.g-check .g-box .ic { width: 11px; height: 11px; stroke-width: 3; }
+.g-dim { position: absolute; inset: 0; background: rgb(0 0 0 / .4); }
+.g-dialog { position: absolute; left: 12px; right: 12px; top: 34%; padding: 12px; border-radius: 14px; background: #fff; box-shadow: 0 12px 30px rgb(0 0 0 / .3); }
+.g-dialog b { font-size: 11px; display: block; } .g-dialog p { margin: 4px 0 8px; color: #6c6a78; font-size: 9.5px; }
+.g-dialog div { display: flex; justify-content: flex-end; gap: 10px; font-weight: 700; color: #4b5bd7; }
+.g-dialog div span { padding: 3px 6px; border-radius: 6px; position: relative; }
+.g-menu { position: absolute; right: 8px; top: 34px; width: 150px; border-radius: 10px; background: #fff; box-shadow: 0 10px 26px rgb(0 0 0 / .25); padding: 4px 0; display: flex; flex-direction: column; }
+.g-menu span { padding: 8px 10px; position: relative; }
+/* l'endroit où toucher : halo qui pulse */
+.g-stage .hit { background: color-mix(in srgb, #a08cff 22%, transparent); border-radius: 8px; outline: 2px solid #8f7bff; outline-offset: -2px; }
+.g-stage .hit::after { content: ""; position: absolute; right: 14px; top: 50%; width: 22px; height: 22px; margin-top: -11px; border-radius: 50%; background: rgb(143 123 255 / .55); box-shadow: 0 0 0 0 rgb(143 123 255 / .6); animation: g-tap 1.4s ease-out infinite; pointer-events: none; }
+.g-dots.hit::after, .g-dialog .hit::after { right: 50%; margin-right: -11px; }
+@keyframes g-tap { 0% { transform: scale(.6); box-shadow: 0 0 0 0 rgb(143 123 255 / .6); } 70% { transform: scale(1); box-shadow: 0 0 0 14px rgb(143 123 255 / 0); } 100% { transform: scale(.6); box-shadow: 0 0 0 0 rgb(143 123 255 / 0); } }
+.tap10::after { animation-duration: .35s !important; }
+.g-count { position: absolute; left: calc(50% + 70px); bottom: 64px; padding: 6px 10px; border-radius: 999px; background: var(--c1); color: var(--on-c1); font: 800 15px var(--f-display); box-shadow: 0 10px 24px -8px var(--c1); animation: g-pop 1.4s var(--ease-out) infinite; }
+@keyframes g-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+/* écran de voiture dessiné */
+.g-car { width: min(100%, 420px); aspect-ratio: 16 / 7.5; border-radius: 18px; padding: 10px; background: #0b0b12; box-shadow: 0 30px 60px -24px rgb(0 0 0 / .9), inset 0 0 0 1px rgb(255 255 255 / .1); display: flex; gap: 10px; color: #e9e8f2; }
+.g-car-side { display: flex; flex-direction: column; justify-content: space-around; padding: 0 6px; border-right: 1px solid #22212e; color: #8a88a0; }
+.g-car-grid { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); align-content: center; gap: 10px; }
+.g-car-grid span { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; color: #b9b7cc; position: relative; padding: 6px 0; }
+.g-car-grid i { width: 40px; height: 40px; border-radius: 50%; background: #23222f; display: grid; place-items: center; }
+.g-car-grid .g-me i { background: #07070d; box-shadow: 0 0 0 2px #8f7bff, 0 0 24px #8f7bff; }
+.g-car-grid .g-me i svg { width: 26px; height: 26px; }
+.g-car-grid .g-me { color: #fff; font-weight: 700; }
+.g-car-grid .hit { outline: none; background: none; }
+.g-car-grid .hit::after { top: 14px; right: calc(50% - 30px); }
+@media (max-width: 520px) { .guide { padding: 0; place-items: stretch; } .g-card { width: 100%; max-height: none; height: 100dvh; border-radius: 0; border: 0; padding: calc(14px + env(safe-area-inset-top, 0px)) 18px calc(14px + env(safe-area-inset-bottom, 0px)); } .g-stage { height: auto; flex: 1; min-height: 260px; } }
+@media (prefers-reduced-motion: reduce) { .g-stage, .g-stage .hit::after, .g-count { animation: none !important; } }
+.calm .g-stage .hit::after, .calm .g-count { animation: none; }
+
 </style>
 </head>
 <body>
@@ -806,6 +879,7 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 <div class="drop" id="drop" hidden><div class="drop-card"><div id="drop-ic"></div><h2>Lâche ta musique ici</h2><p>Un dossier entier ou quelques fichiers, tout se range tout seul.</p></div></div>
 <div class="menu" id="menu" hidden role="menu"></div>
 <div class="sheet" id="sheet" hidden></div>
+<div class="guide" id="guide" hidden></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <input type="file" id="pick-dir" webkitdirectory directory multiple hidden>
 <input type="file" id="pick-files" multiple accept="audio/*,.mp3,.flac,.m4a,.aac,.ogg,.oga,.opus,.wav,.webm,.weba" hidden>
@@ -892,6 +966,7 @@ const isPhone = () => matchMedia("(max-width: 760px)").matches;
 
 /* ===================== icônes (tracés style Lucide) ===================== */
 const ICONS = {
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
   mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><circle cx="17" cy="6" r="2"/>',
   burst: '<path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.9 4.9 2.8 2.8"/><path d="m16.3 16.3 2.8 2.8"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.9 19.1 2.8-2.8"/><path d="m16.3 7.7 2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
   retro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15v-3"/><path d="M9 15V9"/><path d="M12 15v-5"/><path d="M15 15v-2"/><path d="M18 15V8"/>',
@@ -1582,6 +1657,7 @@ const AndroidMusic = CAP ? {
       this.busy = false;
       UI.renderNav(); if (UI.view.name === "home") UI.rerender();
       if (NP && Player.mode === "native") NP.refreshSoon();
+      if (NP && NP.ok) NP.exportSoon();
       if (this.again) { this.again = false; setTimeout(() => this.scan({ quiet: true }), 500); }
     }
   },
@@ -1594,7 +1670,7 @@ const NV = { native: true, fftSize: 4096, frequencyBinCount: 2048, waveLength: 5
 const blobB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => res(""); r.readAsDataURL(blob); });
 const NP = CAP ? {
   ok: false, st: null, gen: 0, win: [], cur: 0, loaded: false, pending: null, lastState: 0, vizOn: false, vol: -1, art: new Set(), artQ: Promise.resolve(),
-  call(m, o) { return CAP.nativePromise("AuroreMusic", m, o || {}); },
+  call(m, o) { try { return CAP.nativePromise("AuroreMusic", m, o || {}); } catch (e) { return Promise.reject(e); } },
   newGen() { let g = Date.now() % 2000000000; if (g === this.gen) g++; return g; },
   /* au démarrage : branche les évènements ; si le service jouait déjà (app rouverte), on reprend où il en est */
   async boot() {
@@ -1603,11 +1679,44 @@ const NP = CAP ? {
     if (!s || typeof s.count !== "number") return;
     this.ok = true;
     try {
-      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (d && d.gen === this.gen) this.apply(d, true); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (!d) return; if (d.gen === this.gen) this.apply(d, true); else if (d.gen < 0 && d.count > 0) this.external(); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "external" }, () => this.external());
       CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
     } catch { /* ancienne version */ }
-    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); });
-    if (s.count > 0 && s.id && L.tracks.has(s.id)) this.adopt(s);
+    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); else this.exportLibrary(); });
+    if (s.count > 0 && s.id && L.tracks.has(s.id)) { if (s.gen < 0 && (store.get("nwin", null) || {}).gen !== s.gen) this.takeOver(s); else this.adopt(s); }
+  },
+  /* Android Auto a lancé une liste : l'app la reprend telle quelle */
+  async external() {
+    if (this._ext) return; this._ext = true;
+    try { const s = await this.call("pstate", { start: false }); if (s.gen < 0 && s.gen !== this.gen && s.count > 0) this.takeOver(s); }
+    catch { /* rien */ } finally { this._ext = false; }
+  },
+  takeOver(s) {
+    const ids = s.ids || [];
+    Q.flushSession();
+    Q.ctx = ids.slice(); Q.order = [...ids.keys()]; Q.pos = s.index; Q.manual = []; Q.label = "Android Auto"; Q.ref = null; Q.fromManual = false; Q.current = null;
+    store.set("nwin", { gen: s.gen, cur: s.index, items: ids.map((id, i) => ({ id, src: "o", p: i })) });
+    this.adopt(s); UI.onQueueChanged();
+  },
+  /* résumé de la bibliothèque pour Android Auto */
+  exportSoon: debounce(() => NP.exportLibrary(), 3000),
+  exportLibrary() {
+    if (!this.ok) return;
+    const media = (id) => !!L.files.get(id)?.media && L.tracks.has(id);
+    const art = (k) => (k && L.art.get(k)?.big ? k : "");
+    const tracks = L.sorted.tracks.filter(media).map((id) => { const t = L.tracks.get(id); return [id, L.files.get(id).mid, t.title, t.artist, t.album || "", art(t.artKey)]; });
+    if (!tracks.length) return;
+    const albums = L.sorted.albums.map((k) => L.albums.get(k)).filter((a) => a && !a.demo).map((a) => [a.key, a.title, a.artist || "", art(a.artKey), a.tracks.filter(media)]).filter((a) => a[4].length);
+    const artists = L.sorted.artists.map((k) => L.artists.get(k)).filter(Boolean).map((a) => { const ids = a.tracks.filter(media); return [a.key, a.name, plural(ids.length, "titre", "titres"), art(a.artKey), ids]; }).filter((a) => a[4].length);
+    const playlists = L.playlists.map((p) => [p.id, p.name, plural(p.ids.length, "titre", "titres"), "", p.ids.filter(media)]).filter((p) => p[4].length);
+    const recent = L.sorted.tracks.filter(media).sort((a, b) => (L.tracks.get(b).addedAt || 0) - (L.tracks.get(a).addedAt || 0)).slice(0, 100);
+    const json = JSON.stringify({ v: 1, tracks, albums, artists, playlists, likes: [...L.likes].filter(media), top: topTracks(50).filter(media), recent });
+    if (json === this._lastExport) return;
+    this._lastExport = json;
+    this.call("plibrary", { json }).catch(() => {});
+    /* pochettes des albums, pour les afficher dans la voiture */
+    this.ensureArt(albums.map((a) => a[4][0]), 600000);
   },
   adopt(s) {
     const saved = store.get("nwin", null), same = saved && saved.gen === s.gen && Array.isArray(saved.items);
@@ -3281,6 +3390,7 @@ const UI = {
     this.histDepth = Math.max(0, this.histDepth - 1);
     if (Menu.isOpen) Menu.close();
     if (!$("#sheet").hidden) { $("#sheet").hidden = true; $("#sheet").innerHTML = ""; return; }
+    if (!$("#guide").hidden) return Guide.close(true);
     if (this.imm) return this.closeImm(true);
     if (this.stack.length) this.back(true);
   },
@@ -3909,6 +4019,107 @@ function statsHTML() {
 </div></section>`;
 }
 
+/* ===================== guide illustré : aurore dans Android Auto ===================== */
+/* Android Auto n'affiche que les apps du Play Store, sauf si on autorise les « sources inconnues »
+   dans son mode développeur. Le guide montre chaque écran, avec l'endroit où toucher. */
+const AUTO_STEPS = [
+  {
+    title: "Ouvre les réglages d'Android Auto",
+    text: "Android Auto n'affiche que les apps du Play Store. aurore s'installe sans le Store : il faut l'autoriser une fois, ça prend une minute.",
+    how: "Touche « Ouvrir Android Auto » ci-dessous, puis « Paramètres supplémentaires dans l'application ».",
+    open: true,
+    art: () => phone(html`${bar("Infos sur l'appli")}
+      <div class="g-apphead"><span class="g-appic">${icon("car")}</span><b>Android Auto</b><small>Installée</small></div>
+      <div class="g-btns"><span>Ouvrir</span><span>Forcer l'arrêt</span></div>
+      ${rowg("Notifications")}${rowg("Autorisations")}
+      ${rowg("Paramètres supplémentaires dans l'application", "hit")}`),
+  },
+  {
+    title: "Touche 10 fois « Version »",
+    text: "Tout en bas des réglages d'Android Auto, touche la ligne « Version » une dizaine de fois de suite.",
+    how: "Le téléphone compte les touches, comme pour un code secret.",
+    art: () => phone(html`${bar("Android Auto", true)}
+      ${rowg("Démarrer Android Auto automatiquement")}${rowg("Écran")}${rowg("Messages")}${rowg("Notifications")}
+      <div class="g-sec">À propos</div>
+      ${rowg("Version", "hit tap10", "13.4.6")}`, html`<span class="g-count" aria-hidden="true">×10</span>`),
+  },
+  {
+    title: "Accepte le mode développeur",
+    text: "Une fenêtre te demande d'autoriser les paramètres de développement.",
+    how: "Touche « OK ». Rien ne change dans ta voiture pour l'instant.",
+    art: () => phone(html`${bar("Android Auto", true)}
+      ${rowg("Démarrer Android Auto automatiquement")}${rowg("Écran")}${rowg("Messages")}${rowg("Version", "", "13.4.6")}
+      <div class="g-dim"></div>
+      <div class="g-dialog"><b>Autoriser les paramètres de développement ?</b><p>Ces paramètres sont destinés aux développeurs.</p><div><span>Annuler</span><span class="hit">OK</span></div></div>`),
+  },
+  {
+    title: "Ouvre les paramètres pour développeurs",
+    text: "Toujours dans les réglages d'Android Auto, touche les trois points en haut à droite.",
+    how: "Choisis « Paramètres pour les développeurs ».",
+    art: () => phone(html`${bar("Android Auto", true, true)}
+      ${rowg("Démarrer Android Auto automatiquement")}${rowg("Écran")}${rowg("Messages")}${rowg("Notifications")}
+      <div class="g-menu"><span class="hit">Paramètres pour les développeurs</span><span>Quitter le mode développeur</span><span>Aide et commentaires</span></div>`),
+  },
+  {
+    title: "Coche « Sources inconnues »",
+    text: "Fais défiler la liste jusqu'à « Sources inconnues » et coche la case.",
+    how: "C'est ce réglage qui laisse aurore apparaître dans la voiture.",
+    art: () => phone(html`${bar("Paramètres pour les développeurs", true)}
+      ${rowg("Mode d'application")}${rowg("Résolution vidéo")}${rowg("Enregistrer le journal du véhicule")}
+      <div class="g-row hit g-check"><span>Sources inconnues<small>Autoriser les applis hors Play Store</small></span><i class="g-box">${icon("check", "sm")}</i></div>
+      ${rowg("Afficher les cadres de débogage")}`),
+  },
+  {
+    title: "Branche ton téléphone",
+    text: "Connecte ton téléphone à la voiture : aurore apparaît avec les autres apps. Tes playlists, albums et artistes sont là, et tu peux dire « Joue … sur aurore ».",
+    how: "Tu ne la vois pas ? Dans les réglages d'Android Auto, ouvre « Écran » puis « Personnaliser le lanceur » et coche aurore. Débranche et rebranche le téléphone.",
+    art: () => html`<div class="g-car" aria-hidden="true">
+      <div class="g-car-side">${icon("home", "sm")}${icon("car", "sm")}${icon("music", "sm")}</div>
+      <div class="g-car-grid">${["Maps", "Téléphone", "Messages", "aurore", "Agenda", "Météo"].map((n) => html`<span class="${n === "aurore" ? "hit g-me" : ""}"><i>${n === "aurore" ? raw(brandMark()) : ""}</i>${n}</span>`)}</div>
+    </div>`,
+  },
+];
+function brandMark() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="11" width="3" height="9" rx="1.5" fill="#a08cff"/><rect x="8.2" y="6" width="3" height="14" rx="1.5" fill="#7fb0f0"/><rect x="13.4" y="9" width="3" height="11" rx="1.5" fill="#5fd0d8"/><rect x="18.6" y="4" width="3" height="16" rx="1.5" fill="#3fe0c5"/></svg>'; }
+const bar = (t, back, dots) => html`<div class="g-bar">${back ? icon("back", "sm") : ""}<b>${t}</b>${dots ? html`<span class="hit g-dots">⋮</span>` : html`<span class="g-dots">⋮</span>`}</div>`;
+const rowg = (t, cls = "", val = "") => html`<div class="g-row ${cls}"><span>${t}</span>${val ? html`<small>${val}</small>` : ""}</div>`;
+const phone = (inner, extra = "") => html`<div class="g-phone" aria-hidden="true"><div class="g-screen">${inner}</div></div>${extra}`;
+
+const Guide = {
+  i: 0,
+  open(start = 0) { this.i = start; this.render(); $("#guide").hidden = false; requestAnimationFrame(() => $("#guide").classList.add("open")); UI.histPush("guide"); this.bind(); },
+  close(fromPop) { const g = $("#guide"); if (!g || g.hidden) return; if (!fromPop) UI.histPop(); g.classList.remove("open"); setTimeout(() => { g.hidden = true; g.innerHTML = ""; }, 260); store.set("autoGuideSeen", true); },
+  go(d) { const n = clamp(this.i + d, 0, AUTO_STEPS.length - 1); if (n === this.i) return; this.dir = d; this.i = n; this.render(); },
+  render() {
+    const s = AUTO_STEPS[this.i], n = AUTO_STEPS.length, last = this.i === n - 1;
+    setHTML($("#guide"), html`<div class="g-card" role="dialog" aria-modal="true" aria-labelledby="g-title">
+  <div class="g-top"><span class="g-kicker">${icon("car", "sm")} Android Auto</span><span class="g-step" aria-live="polite">Étape ${this.i + 1} sur ${n}</span><button class="icon-btn" data-act="guide-close" aria-label="Fermer le guide">${icon("x")}</button></div>
+  <div class="g-progress" aria-hidden="true">${AUTO_STEPS.map((_, k) => html`<i class="${k < this.i ? "done" : k === this.i ? "on" : ""}"></i>`)}</div>
+  <div class="g-stage ${this.dir < 0 ? "from-left" : "from-right"}" data-step="${this.i}">${s.art()}</div>
+  <div class="g-text"><h2 id="g-title">${s.title}</h2><p>${s.text}</p><p class="g-how">${icon("info", "sm")}<span>${s.how}</span></p></div>
+  ${s.open ? html`<button class="btn primary g-open" data-act="guide-open-auto">${icon("external", "sm")} Ouvrir Android Auto</button>` : ""}
+  <div class="g-nav"><button class="btn ghost" data-act="guide-prev" ${raw(this.i ? "" : "disabled")}>${icon("back", "sm")} Précédent</button>${last ? html`<button class="btn primary" data-act="guide-close">C'est fait</button>` : html`<button class="btn primary" data-act="guide-next">Suivant ${icon("right", "sm")}</button>`}</div>
+  <p class="g-note">Les noms peuvent changer un peu selon ton téléphone (Samsung, Pixel, Xiaomi…).</p>
+</div>`);
+    this.dir = 0;
+  },
+  bind() {
+    if (this.bound) return; this.bound = true;
+    const g = $("#guide"); let s = null;
+    g.addEventListener("pointerdown", (e) => { if (e.target.closest("button")) return; s = { x: e.clientX, y: e.clientY }; });
+    g.addEventListener("pointerup", (e) => { if (!s) return; const dx = e.clientX - s.x, dy = e.clientY - s.y; s = null; if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.4) this.go(dx < 0 ? 1 : -1); });
+    g.addEventListener("click", (e) => { if (e.target === g) this.close(); });
+    document.addEventListener("keydown", (e) => { if (g.hidden) return; if (e.key === "ArrowRight") this.go(1); else if (e.key === "ArrowLeft") this.go(-1); });
+  },
+  async openAuto() {
+    if (!AndroidMusic) return toast("Ouvre ce guide depuis l'app aurore sur ton téléphone.");
+    try {
+      const r = await AndroidMusic.call("openAuto");
+      if (!r.installed) toast("Android Auto n'est pas installé sur ce téléphone. Installe-le depuis le Play Store, puis reviens ici.", { ms: 8000 });
+      else if (r.opened !== "details") toast("Ouvre les Paramètres du téléphone, puis Applications et Android Auto.", { ms: 8000 });
+    } catch { toast("Mets aurore à jour pour ouvrir Android Auto d'ici. Sinon : Paramètres du téléphone, puis Applications et Android Auto.", { ms: 8000 }); }
+  },
+};
+
 /* ===================== découvertes (Claude, via la capacité « sample ») ===================== */
 const MOODS = [
   ["proche", "Dans la même veine", "dans la même veine que mes artistes préférés"],
@@ -4054,6 +4265,7 @@ function playRow(c) {
   Q.playList(c.list.ids, c.i, c.list.opts.label || "", c.list.opts.ref || null);
 }
 function toggleLike(id) {
+  if (NP && NP.ok) NP.exportSoon();
   if (!id) return;
   if (L.likes.has(id)) { L.likes.delete(id); toast("Retiré des titres likés."); }
   else { L.likes.add(id); toast("Ajouté aux titres likés."); }
@@ -4170,6 +4382,11 @@ const ACTIONS = {
   "close-sheet": () => closeSheet(),
   "set-memo": () => { L.memorize = !L.memorize; DB.put("kv", "memorize", L.memorize); store.set("askedMemo", true); if (L.memorize) { memorizeFiles(); toast("Ta musique sera gardée dans le lecteur."); } else { forgetFiles(); toast("Copie supprimée. Ton dossier reste la source."); } openSettings(); UI.onLibraryProgress(); },
   "set-calm": () => { setCalm(!Viz.calm); openSettings(); },
+  "auto-guide": () => { closeSheet(); Guide.open(0); },
+  "guide-close": () => Guide.close(),
+  "guide-next": () => Guide.go(1),
+  "guide-prev": () => Guide.go(-1),
+  "guide-open-auto": () => Guide.openAuto(),
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -4231,6 +4448,7 @@ ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le l
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
 ${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
+${CAP ? html`<div class="set-row"><div><b>Android Auto</b><p>Retrouve tes playlists, albums et artistes sur l'écran de ta voiture. Un réglage à faire une seule fois, montré pas à pas.</p></div><button class="btn sm primary" data-act="auto-guide">${icon("car", "sm")} Voir le guide</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b><p>La même app, sans navigateur : installateur pour ton PC et APK pour ton téléphone.</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`}
 ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
@@ -4269,7 +4487,7 @@ function bindEvents() {
   });
   document.addEventListener("keydown", (e) => {
     const tag = e.target.tagName; const typing = tag === "INPUT" && e.target.type !== "range" || tag === "TEXTAREA" || e.target.isContentEditable;
-    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
+    if (e.key === "Escape") { if (Menu.isOpen) return Menu.close(); if (!$("#guide").hidden) return Guide.close(); if (!$("#sheet").hidden) return closeSheet(); if (UI.imm) return UI.closeImm(); if (typing) e.target.blur(); return; }
     if (e.target.id === "pl-title" && e.key === "Enter") { e.target.blur(); return; }
     if (typing) return;
     if ((e.key === "Enter" || e.key === " ") && e.target.matches("[role='button'][data-act]")) { e.preventDefault(); e.target.click(); return; }
@@ -4418,7 +4636,7 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide };
 boot();
 
 })();

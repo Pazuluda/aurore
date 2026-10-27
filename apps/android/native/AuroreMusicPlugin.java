@@ -103,8 +103,6 @@ public class AuroreMusicPlugin extends Plugin {
     }
 
     private ExoPlayer attached;
-    /** numéro de la file envoyée par l'app : les évènements d'une ancienne file sont ignorés côté app */
-    private int gen = 0;
     private String lastError;
     private volatile boolean vizPlaying;
 
@@ -140,6 +138,11 @@ public class AuroreMusicPlugin extends Plugin {
     };
 
     private void attach(ExoPlayer p) {
+        AuroreService.onExternalQueue = () -> main.post(() -> {
+            JSObject o = new JSObject();
+            o.put("gen", AuroreService.gen);
+            notifyListeners("external", o);
+        });
         if (attached == p) return;
         if (attached != null) attached.removeListener(listener);
         p.addListener(listener);
@@ -181,7 +184,7 @@ public class AuroreMusicPlugin extends Plugin {
     private JSObject state(Player p, boolean withIds, int reason) {
         JSObject o = new JSObject();
         MediaItem m = p.getCurrentMediaItem();
-        o.put("gen", gen);
+        o.put("gen", AuroreService.gen);
         o.put("id", m != null ? m.mediaId : "");
         o.put("index", p.getCurrentMediaItemIndex());
         o.put("count", p.getMediaItemCount());
@@ -204,9 +207,7 @@ public class AuroreMusicPlugin extends Plugin {
     }
 
     private File artFile(String key) {
-        String safe = key.replaceAll("[^A-Za-z0-9_-]", "_");
-        if (safe.length() > 80) safe = safe.substring(0, 80);
-        return new File(new File(getContext().getCacheDir(), "art"), safe + ".img");
+        return ArtProvider.file(getContext(), key);
     }
 
     private List<MediaItem> items(PluginCall call) throws JSONException {
@@ -215,14 +216,7 @@ public class AuroreMusicPlugin extends Plugin {
         if (arr == null) return list;
         for (int i = 0; i < arr.length(); i++) {
             JSONObject o = arr.getJSONObject(i);
-            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, o.getLong("mid"));
-            MediaMetadata.Builder md = new MediaMetadata.Builder()
-                .setTitle(o.optString("title", ""))
-                .setArtist(o.optString("artist", ""))
-                .setAlbumTitle(o.optString("album", ""));
-            String art = o.optString("art", "");
-            if (!art.isEmpty()) md.setArtworkUri(Uri.fromFile(artFile(art)));
-            list.add(new MediaItem.Builder().setMediaId(o.getString("id")).setUri(uri).setMediaMetadata(md.build()).build());
+            list.add(AuroreService.track(o.getString("id"), o.getLong("mid"), o.optString("title", ""), o.optString("artist", ""), o.optString("album", ""), o.optString("art", "")));
         }
         return list;
     }
@@ -247,7 +241,7 @@ public class AuroreMusicPlugin extends Plugin {
         final boolean play = call.getBoolean("play", true);
         final int repeat = call.getInt("repeat", Player.REPEAT_MODE_OFF);
         withPlayer(call, (p) -> {
-            gen = g;
+            AuroreService.gen = g;
             lastError = null;
             p.setRepeatMode(repeat);
             p.setMediaItems(list, index, pos);
@@ -367,6 +361,48 @@ public class AuroreMusicPlugin extends Plugin {
             return;
         }
         withPlayer(call, (p) -> call.resolve(state(p, true, -1)));
+    }
+
+    /* ---- Android Auto ---- */
+
+    /** résumé de la bibliothèque pour Android Auto (titres, albums, artistes, playlists…) */
+    @PluginMethod
+    public void plibrary(PluginCall call) {
+        String json = call.getString("json", "");
+        if (json.isEmpty()) {
+            call.reject("Bibliothèque vide");
+            return;
+        }
+        try {
+            AutoLibrary.save(getContext(), json);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Bibliothèque non enregistrée");
+        }
+    }
+
+    /** ouvre les réglages d'Android Auto (ou sa fiche, d'où l'on va dans « Paramètres supplémentaires ») */
+    @PluginMethod
+    public void openAuto(PluginCall call) {
+        String pkg = "com.google.android.projection.gearhead";
+        JSObject r = new JSObject();
+        try {
+            getContext().getPackageManager().getPackageInfo(pkg, 0);
+        } catch (Exception e) {
+            r.put("installed", false);
+            call.resolve(r);
+            return;
+        }
+        r.put("installed", true);
+        try {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            r.put("opened", "details");
+        } catch (Exception e) {
+            r.put("opened", "none");
+        }
+        call.resolve(r);
     }
 
     /* ---- pochettes pour la notification et l'écran verrouillé ---- */
