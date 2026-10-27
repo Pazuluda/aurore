@@ -137,6 +137,7 @@ const ACTIONS = {
   "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
   "edit-nopic": () => { const d = new FormData($("#edit-form")); Edit.reset(); Edit.dropPic = true; Edit.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), ""); },
   "edit-undo": () => Edit.undo(),
+  "edit-recrop": () => Edit.recrop(Edit._artKey),
   "lan-open": () => (LanPC || LanPhone).open(),
   "lan-code": async () => { await NATIVE_WIN.lan.code(); LanPC.refresh(); LanPC.open(); },
   "lan-stop": async () => { await NATIVE_WIN.lan.stop(); LanPC.open(); },

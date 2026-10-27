@@ -454,9 +454,9 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
     setHTML(el, html`<div class="imm-bg" style="${big ? `background-image:url('${big}')` : ""}"></div><canvas aria-hidden="true"></canvas>
 <div class="imm-top"><button class="icon-btn" data-act="close-imm" aria-label="Fermer le mode immersif" title="Fermer (Échap)">${icon("down")}</button>
 <div class="ctx"><small>Lecture depuis</small><span>${Q.label || "ta bibliothèque"}</span></div>
-<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${String(Viz.mode === k)}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
+<div class="imm-right"><div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${String(Viz.mode === k)}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
 <button class="viz-pick" data-act="viz-menu" aria-label="Changer de visualiseur">${icon((modes.find((m) => m[0] === Viz.mode) || modes[0])[2], "sm")}<span>${(modes.find((m) => m[0] === Viz.mode) || modes[0])[1]}</span></button>
-<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${String(this.immQueue)}">${icon("queue", "sm")}</button></div>
+<button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${String(this.immQueue)}">${icon("queue", "sm")}</button></div></div>
 <div></div>
 <div class="imm-bottom">
   <div class="imm-meta"><div class="d-cover">${t && artSmall(t.artKey) ? html`<img src="${artSmall(t.artKey)}" alt="">` : icon("music")}</div><div><div class="imm-title">${t ? t.title : "Rien en lecture"}</div><div class="imm-artist">${t ? html`${t.artist}${t.album ? " · " + t.album : ""}` : "Lance un titre depuis ta bibliothèque"}</div></div><button class="icon-btn heart js-like" data-act="like-current" aria-label="Ajouter aux titres likés">${icon("heart")}</button></div>
