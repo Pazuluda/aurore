@@ -8,7 +8,7 @@ for p in res.rglob("splash.png"): p.unlink()
 shutil.copytree(here / "res", res, dirs_exist_ok=True)
 
 man = app / "src" / "main" / "AndroidManifest.xml"; s = man.read_text()
-perms = ["android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK", "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK", "android.permission.READ_MEDIA_AUDIO"]
+perms = ["android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK", "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK", "android.permission.READ_MEDIA_AUDIO"]
 add = "".join(f'    <uses-permission android:name="{p}" />\n' for p in perms if p not in s)
 if "android.permission.READ_EXTERNAL_STORAGE" not in s:
     add += '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n'
@@ -30,6 +30,18 @@ if "AuroreService" not in s:
             android:name=".ArtProvider"
             android:authorities="io.github.pazuluda.aurore.art"
             android:exported="true" />
+        <!-- widget de l'écran d'accueil -->
+        <receiver
+            android:name=".AuroreWidget"
+            android:exported="false"
+            android:label="aurore">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_aurore_info" />
+        </receiver>
         <!-- aurore apparaît dans Android Auto -->
         <meta-data
             android:name="com.google.android.gms.car.application"
@@ -61,5 +73,7 @@ v.write_text(s)
 
 strings = res / "values" / "strings.xml"; s = strings.read_text()
 s = re.sub(r'(<string name="(app_name|title_activity_main)">)[^<]*(</string>)', r"\1aurore\3", s)
+if "widget_description" not in s:
+    s = s.replace("</resources>", '    <string name="widget_description">Le titre en cours, avec lecture, précédent et suivant</string>\n</resources>')
 strings.write_text(s)
 print(f"android prêt : version {version} ({code})")

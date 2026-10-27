@@ -88,6 +88,20 @@ public class AuroreService extends MediaLibraryService {
         setMediaNotificationProvider(notif);
         addSession(session);
         instance = this;
+        // widget de l'écran d'accueil : suit le titre et la lecture
+        player.addListener(new androidx.media3.common.Player.Listener() {
+            @Override
+            public void onEvents(androidx.media3.common.Player p, androidx.media3.common.Player.Events e) {
+                if (e.containsAny(
+                    androidx.media3.common.Player.EVENT_MEDIA_ITEM_TRANSITION,
+                    androidx.media3.common.Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                    androidx.media3.common.Player.EVENT_PLAYBACK_STATE_CHANGED,
+                    androidx.media3.common.Player.EVENT_MEDIA_METADATA_CHANGED,
+                    androidx.media3.common.Player.EVENT_TIMELINE_CHANGED
+                )) AuroreWidget.refresh(AuroreService.this);
+            }
+        });
+        AuroreWidget.refresh(this);
     }
 
     @Override
@@ -105,6 +119,7 @@ public class AuroreService extends MediaLibraryService {
         }
         player = null;
         super.onDestroy();
+        AuroreWidget.refresh(this);
     }
 
     /** pochette servie aux autres apps (Android Auto, écran verrouillé) par ArtProvider */

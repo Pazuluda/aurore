@@ -363,6 +363,93 @@ public class AuroreMusicPlugin extends Plugin {
         withPlayer(call, (p) -> call.resolve(state(p, true, -1)));
     }
 
+    /* ---- mise à jour de l'app, entièrement dans l'app ---- */
+
+    private volatile boolean updating;
+
+    /** télécharge le nouvel APK (progression envoyée à l'app), puis ouvre l'installation Android */
+    @PluginMethod
+    public void pinstallApk(final PluginCall call) {
+        final String url = call.getString("url", "");
+        final String version = call.getString("version", "nouvelle").replaceAll("[^0-9.]", "");
+        if (!url.startsWith("https://")) {
+            call.reject("Adresse invalide");
+            return;
+        }
+        final Context ctx = getContext();
+        if (Build.VERSION.SDK_INT >= 26 && !ctx.getPackageManager().canRequestPackageInstalls()) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + ctx.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+            } catch (Exception ignored) {
+                // réglage introuvable : l'app propose le téléchargement par le navigateur
+            }
+            JSObject r = new JSObject();
+            r.put("state", "permission");
+            call.resolve(r);
+            return;
+        }
+        if (updating) {
+            JSObject r = new JSObject();
+            r.put("state", "busy");
+            call.resolve(r);
+            return;
+        }
+        updating = true;
+        new Thread(() -> {
+            try {
+                File dir = new File(ctx.getCacheDir(), "update");
+                if (!dir.exists()) dir.mkdirs();
+                File apk = new File(dir, "aurore-" + version + ".apk");
+                if (!apk.exists() || apk.length() < 100000) {
+                    File[] old = dir.listFiles();
+                    if (old != null) for (File f : old) f.delete();
+                    File part = new File(dir, "aurore-" + version + ".part");
+                    java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                    c.setInstanceFollowRedirects(true);
+                    c.setConnectTimeout(20000);
+                    c.setReadTimeout(30000);
+                    int code = c.getResponseCode();
+                    if (code / 100 != 2) throw new IOException("HTTP " + code);
+                    long total = c.getContentLengthLong(), done = 0;
+                    int lastPct = -1;
+                    try (InputStream in = c.getInputStream(); FileOutputStream out = new FileOutputStream(part)) {
+                        byte[] buf = new byte[65536];
+                        int n;
+                        while ((n = in.read(buf)) > 0) {
+                            out.write(buf, 0, n);
+                            done += n;
+                            int pct = total > 0 ? (int) (done * 100 / total) : -1;
+                            if (pct != lastPct) {
+                                lastPct = pct;
+                                JSObject ev = new JSObject();
+                                ev.put("state", "downloading");
+                                ev.put("percent", Math.max(0, pct));
+                                notifyListeners("update", ev);
+                            }
+                        }
+                    } finally {
+                        c.disconnect();
+                    }
+                    if (!part.renameTo(apk)) throw new IOException("fichier");
+                }
+                Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", apk);
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setDataAndType(uri, "application/vnd.android.package-archive");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                ctx.startActivity(i);
+                JSObject r = new JSObject();
+                r.put("state", "installing");
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Téléchargement impossible", "DOWNLOAD");
+            } finally {
+                updating = false;
+            }
+        }, "aurore-maj").start();
+    }
+
     /* ---- Android Auto ---- */
 
     /** résumé de la bibliothèque pour Android Auto (titres, albums, artistes, playlists…) */

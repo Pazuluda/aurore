@@ -395,7 +395,7 @@ const Updates = {
     const prev = this.st.state; this.st = s || { state: "idle" };
     if (this.manual && this.st.state === "uptodate") { toast(`aurore est à jour (version ${this.current}).`); this.manual = false; }
     if (this.manual && this.st.state === "error") { toast("Impossible de vérifier les mises à jour pour l'instant. Vérifie ta connexion."); this.manual = false; }
-    if (this.st.state === "ready" && prev !== "ready") toast(NATIVE_WIN ? `La version ${this.st.version} est prête : clique sur « Mettre à jour » en haut de la fenêtre.` : `La version ${this.st.version} d'aurore est disponible : touche « Mettre à jour » en haut.`, { ms: 8000 });
+    if (this.st.state === "ready" && prev !== "ready" && !this._told) { this._told = true; toast(NATIVE_WIN ? `La version ${this.st.version} est prête : clique sur « Mettre à jour » en haut de la fenêtre.` : `La version ${this.st.version} d'aurore est disponible : touche « Mettre à jour » en haut.`, { ms: 8000 }); }
     this.render();
   },
   async check(manual) {
@@ -416,16 +416,36 @@ const Updates = {
     const s = this.st.state;
     if (s === "ready") {
       if (NATIVE_WIN) { toast("Installation de la mise à jour : aurore va redémarrer."); NATIVE_WIN.update.install(); }
-      else { toast("Téléchargement de la nouvelle version : ouvre-la quand c'est fini pour l'installer par-dessus."); openExternal(this.st.url || RELEASES_URL); }
+      else this.installAndroid();
       return;
     }
     if (s === "downloading") { toast(`Téléchargement de la version ${this.st.version || ""}… ${this.st.percent || 0} %`); return; }
     if (s !== "checking") this.check(true);
   },
+  /* Android : téléchargement et installation dans l'app (logo de mise à jour qui se remplit) */
+  async installAndroid() {
+    const st = this.st, url = st.url || RELEASES_URL;
+    if (!this._updBound) { this._updBound = true; try { CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "update" }, (d) => { if (d && d.state === "downloading") this.set({ ...this.ready, state: "downloading", percent: d.percent }); }); } catch { /* ancienne version */ } }
+    this.ready = { state: "ready", version: st.version, url };
+    let r;
+    try { r = await AndroidMusic.call("pinstallApk", { url, version: st.version || "" }); }
+    catch (e) {
+      this.set(this.ready);
+      if (/not implemented|is not a function|UNIMPLEMENTED/i.test(String(e && (e.code || e.message)))) { toast("Téléchargement de la nouvelle version : ouvre-la quand c'est fini pour l'installer par-dessus."); openExternal(url); }
+      else toast("Téléchargement interrompu. Vérifie ta connexion et retouche « Mettre à jour ».", { action: { label: "Navigateur", fn: () => openExternal(url) }, ms: 9000 });
+      return;
+    }
+    if (r.state === "permission") {
+      this.set(this.ready);
+      toast("Autorise aurore à installer ses mises à jour (« Autoriser cette source »), puis reviens : l'installation reprend toute seule.", { ms: 10000 });
+      const again = () => { if (document.hidden) return; document.removeEventListener("visibilitychange", again); setTimeout(() => this.installAndroid(), 400); };
+      document.addEventListener("visibilitychange", again);
+    } else if (r.state === "installing") { this.set(this.ready); toast("Touche « Installer » : ta musique, tes playlists et tes stats sont gardées."); }
+  },
   render() {
     const el = $("#upd"); if (!el) return;
     const s = this.st.state;
-    const show = NATIVE_WIN ? true : CAP ? s === "ready" || s === "checking" : false;
+    const show = NATIVE_WIN ? true : CAP ? s === "ready" || s === "checking" || s === "downloading" : false;
     el.hidden = !show; if (!show) return;
     el.className = "upd " + s;
     const pct = clamp(this.st.percent || 0, 0, 100);
