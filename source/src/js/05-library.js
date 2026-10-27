@@ -6,7 +6,7 @@ const L = {
   tracks: new Map(), files: new Map(), art: new Map(),
   albums: new Map(), artists: new Map(), genres: [],
   sorted: { tracks: [], albums: [], artists: [] },
-  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [],
+  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [], edits: {},
   memorize: false, rootName: "", importing: null, memorizing: null, dirHandle: null,
   version: 0,
 };
@@ -203,7 +203,7 @@ async function loadLibrary() {
   for (const [k, a] of arts) L.art.set(k, a);
   const K = Object.fromEntries(kv);
   L.stats = K.stats || {}; L.likes = new Set(K.likes || []); L.playlists = K.playlists || [];
-  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || [];
+  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K);
   L.memorize = !!K.memorize; L.rootName = K.root || ""; L.dirHandle = K.dirHandle || null;
   if (L.memorize) for (const [id, blob] of await DB.all("files")) if (L.tracks.has(id)) L.files.set(id, blob);
   rebuildIndex();
@@ -282,6 +282,7 @@ async function importEntries(entries, opts = {}) {
         }
       }
       if (!t.albumKey && !L.art.has(t.artKey)) t.artKey = "";
+      Edit.applyTo(t);
       L.tracks.set(t.id, t); L.files.set(t.id, e.file);
       batch.push(t);
       L.importing.done++;

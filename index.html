@@ -861,6 +861,24 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 .eq-band input[type="range"]:hover::-webkit-slider-runnable-track { background: linear-gradient(0deg, var(--c1) var(--p), rgb(var(--hl) / .2) var(--p)); }
 .eq-note { margin: 0; font-size: 12.5px; color: var(--text-3); }
 
+/* ---------- modifier un titre ---------- */
+.edit { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.edit-cover { display: flex; gap: 16px; align-items: center; }
+.edit-pic { width: 112px; height: 112px; flex: none; border-radius: 14px; overflow: hidden; background: var(--cc); display: grid; place-items: center; box-shadow: 0 14px 30px -16px rgb(0 0 0 / .7); }
+.edit-pic img { width: 100%; height: 100%; object-fit: cover; }
+.edit-pic .ph { color: rgb(255 255 255 / .85); }
+.edit-pic-btns { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.edit-pic-btns small { font-size: 12px; color: var(--text-3); }
+.edit-pic-btns label.btn { cursor: pointer; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); min-width: 0; flex: 1; }
+.field input { height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line-2); background: rgb(var(--hl) / .04); color: var(--text); font: 500 15px var(--f-body); outline: none; transition: border-color var(--t-fast), box-shadow var(--t-fast); }
+.field input:focus { border-color: var(--c1); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c1) 25%, transparent); }
+.field input:invalid:not(:placeholder-shown) { border-color: var(--danger); }
+.field-row { display: flex; gap: 12px; }
+.edit-note { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 12.5px; color: var(--text-3); }
+.edit-actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.edit-actions .btn { min-height: 44px; }
+
 </style>
 </head>
 <body>
@@ -1005,6 +1023,7 @@ const isPhone = () => matchMedia("(max-width: 760px)").matches;
 
 /* ===================== icônes (tracés style Lucide) ===================== */
 const ICONS = {
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
@@ -2028,7 +2047,7 @@ const L = {
   tracks: new Map(), files: new Map(), art: new Map(),
   albums: new Map(), artists: new Map(), genres: [],
   sorted: { tracks: [], albums: [], artists: [] },
-  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [],
+  stats: {}, likes: new Set(), playlists: [], history: [], days: {}, saved: [], edits: {},
   memorize: false, rootName: "", importing: null, memorizing: null, dirHandle: null,
   version: 0,
 };
@@ -2225,7 +2244,7 @@ async function loadLibrary() {
   for (const [k, a] of arts) L.art.set(k, a);
   const K = Object.fromEntries(kv);
   L.stats = K.stats || {}; L.likes = new Set(K.likes || []); L.playlists = K.playlists || [];
-  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || [];
+  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K);
   L.memorize = !!K.memorize; L.rootName = K.root || ""; L.dirHandle = K.dirHandle || null;
   if (L.memorize) for (const [id, blob] of await DB.all("files")) if (L.tracks.has(id)) L.files.set(id, blob);
   rebuildIndex();
@@ -2304,6 +2323,7 @@ async function importEntries(entries, opts = {}) {
         }
       }
       if (!t.albumKey && !L.art.has(t.artKey)) t.artKey = "";
+      Edit.applyTo(t);
       L.tracks.set(t.id, t); L.files.set(t.id, e.file);
       batch.push(t);
       L.importing.done++;
@@ -4395,6 +4415,87 @@ const Guide = {
   },
 };
 
+/* ===================== modifier les infos d'un titre ou d'un album ===================== */
+/* Les changements sont gardés dans aurore (tes fichiers ne sont pas modifiés) et survivent
+   aux nouvelles recherches de musique. */
+const Edit = {
+  kind: null, id: null, pic: null, picUrl: "", dropPic: false,
+  load(K) { L.edits = K.edits || {}; },
+  save() { DB.put("kv", "edits", L.edits); },
+  /* appliqué à un titre tout juste importé */
+  applyTo(t) {
+    const e = L.edits && L.edits[t.id]; if (!e) return;
+    for (const k of ["title", "artist", "album", "year", "genre", "artKey"]) if (e[k] != null) t[k] = e[k];
+    if (e.artist != null) t.artists = splitArtists(t.artist).length ? splitArtists(t.artist) : [t.artist];
+    if (e.album != null) t.albumKey = e.albumKey != null ? e.albumKey : t.albumKey;
+  },
+  openTrack(id) { const t = L.tracks.get(id); if (!t) return; this.kind = "track"; this.id = id; this.reset(); this.render(t.title, t.artist, t.album, t.year, t.genre, t.artKey); },
+  openAlbum(key) { const a = L.albums.get(key); if (!a) return; this.kind = "album"; this.id = key; this.reset(); this.render(a.title, a.artist === "Artistes variés" ? "" : a.artist, null, a.year, a.genre || "", a.artKey); },
+  reset() { if (this.picUrl) URL.revokeObjectURL(this.picUrl); this.pic = null; this.picUrl = ""; this.dropPic = false; },
+  render(title, artist, album, year, genre, artKey) {
+    const isAlbum = this.kind === "album", cover = this.picUrl || (!this.dropPic && artKey ? artBig(artKey) : "");
+    openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>${isAlbum ? "Modifier l'album" : "Modifier le titre"}</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
+<form class="edit" id="edit-form" autocomplete="off">
+  <div class="edit-cover">
+    <div class="edit-pic" style="--cc:${placeholderColor(title || "?")}">${cover ? html`<img src="${cover}" alt="Pochette">` : html`<div class="ph">${icon(isAlbum ? "disc" : "music", "lg")}</div>`}</div>
+    <div class="edit-pic-btns"><label class="btn sm">${icon("image", "sm")} Choisir une image<input type="file" accept="image/*" id="edit-file" hidden></label>${cover ? html`<button type="button" class="btn sm ghost" data-act="edit-nopic">Retirer</button>` : ""}<small>${isAlbum ? "Pour tous les titres de l'album." : "JPEG, PNG ou WebP."}</small></div>
+  </div>
+  <label class="field"><span>${isAlbum ? "Nom de l'album" : "Titre"}</span><input name="title" value="${title || ""}" required maxlength="200"></label>
+  <label class="field"><span>Artiste</span><input name="artist" value="${artist || ""}" maxlength="200" placeholder="${isAlbum ? "Artistes variés" : "Artiste inconnu"}"></label>
+  ${isAlbum ? "" : html`<label class="field"><span>Album</span><input name="album" value="${album || ""}" maxlength="200" placeholder="Aucun (single)"></label>`}
+  <div class="field-row"><label class="field"><span>Année</span><input name="year" value="${year || ""}" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="2024"></label><label class="field"><span>Genre</span><input name="genre" value="${genre || ""}" maxlength="60" placeholder="Pop, jazz…"></label></div>
+  <p class="edit-note">${icon("info", "sm")}<span>Gardé dans aurore : tes fichiers ne sont pas modifiés.</span></p>
+  <div class="edit-actions">${this.kind === "track" && L.edits[this.id] ? html`<button type="button" class="btn ghost" data-act="edit-undo">Revenir aux infos du fichier</button>` : html`<span></span>`}<button type="submit" class="btn primary">Enregistrer</button></div>
+</form>`);
+    const f = $("#edit-form");
+    f.addEventListener("submit", (e) => { e.preventDefault(); this.commit(new FormData(f)); });
+    $("#edit-file").addEventListener("change", (e) => { const file = e.target.files && e.target.files[0]; if (!file) return; this.reset(); this.pic = file; this.picUrl = URL.createObjectURL(file); const d = new FormData(f); this.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), artKey); });
+    if (!isTouch()) f.querySelector("input[name='title']").focus();
+  },
+  async commit(d) {
+    const val = (k) => (d.get(k) == null ? null : String(d.get(k)).trim());
+    const title = val("title"), artist = val("artist"), album = val("album"), year = cleanYear(val("year")), genre = val("genre");
+    if (!title) return toast("Le titre ne peut pas être vide.");
+    const ids = this.kind === "album" ? (L.albums.get(this.id)?.tracks || []) : [this.id];
+    let artKey = null;
+    if (this.pic) {
+      const art = await makeArt(this.pic).catch(() => null);
+      if (!art) return toast("Cette image n'a pas pu être lue. Essaie un JPEG ou un PNG.");
+      artKey = "e" + hash(this.kind + this.id + Date.now());
+      L.art.set(artKey, art); DB.put("art", artKey, { big: art.big, small: art.small, colors: art.colors });
+      if (NP && NP.ok) NP.art.delete(artKey);
+    } else if (this.dropPic) artKey = "";
+    for (const id of ids) {
+      const t = L.tracks.get(id); if (!t) continue;
+      const e = (L.edits[id] ||= {});
+      if (this.kind === "album") { e.album = t.album = title; e.albumKey = t.albumKey; }
+      else {
+        t.title = e.title = title;
+        if (album !== t.album) { t.album = e.album = album; let dir = dirOf(t.path); const last = dir.split("/").pop(); if (DISC_DIR.test(last)) dir = dirOf(dir); t.albumKey = e.albumKey = album ? "a" + hash(norm(album) + "|" + dir) : ""; }
+      }
+      if (artist || this.kind === "track") { t.artist = e.artist = artist || UNKNOWN_ARTIST; t.artists = splitArtists(t.artist).length ? splitArtists(t.artist) : [t.artist]; }
+      if (this.kind === "album" && artist) t.albumArtist = artist;
+      t.year = e.year = year; t.genre = e.genre = genre;
+      if (artKey !== null) t.artKey = e.artKey = artKey;
+      DB.put("tracks", t.id, t);
+    }
+    this.save(); this.reset(); closeSheet();
+    rebuildIndex(); An.cache = null;
+    if (ids.includes(Q.current)) UI.setTrackInfo(Q.current);
+    UI.onLibraryChanged();
+    if (this.kind === "album" && !L.albums.has(this.id)) UI.go("albums", null, { push: false });
+    if (NP && NP.ok) { NP.exportSoon(); if (Player.mode === "native") NP.refreshSoon(); }
+    toast(this.kind === "album" ? "Album mis à jour." : "Titre mis à jour.");
+  },
+  undo() {
+    const id = this.id; delete L.edits[id]; this.save(); closeSheet();
+    toast("Les infos du fichier reviendront à la prochaine recherche de musique.", { ms: 6000 });
+    const t = L.tracks.get(id); if (!t) return;
+    L.tracks.delete(id); DB.del("tracks", id); rebuildIndex(); UI.onLibraryChanged();
+    const f = L.files.get(id); if (f) importEntries([{ file: f, path: t.path }], { quiet: true });
+  },
+};
+
 /* ===================== découvertes (Claude, via la capacité « sample ») ===================== */
 const DISC_MOODS = [
   ["proche", "Dans la même veine", "dans la même veine que mes artistes préférés"],
@@ -4579,6 +4680,7 @@ function trackMenu(at, id, list) {
   if (t.albumKey && !(UI.view.name === "album" && UI.view.param === t.albumKey)) items.push({ icon: "disc", label: "Aller à l'album", fn: () => UI.go("album", t.albumKey) });
   for (const a of t.artists.slice(0, 3)) items.push({ icon: "artist", label: `Aller à ${a}`, fn: () => UI.go("artist", norm(a)) });
   items.push({ icon: "sparkles", label: "Artistes proches", fn: () => discoverFrom(t.artists[0]) });
+  items.push("sep", { icon: "pencil", label: "Modifier les infos", fn: () => Edit.openTrack(id) });
   if (list && list.opts.playlist) { const p = L.playlists.find((x) => x.id === list.opts.playlist); if (p) items.push("sep", { icon: "trash", label: "Retirer de cette playlist", fn: () => { p.ids = p.ids.filter((x) => x !== id); savePlaylists(); UI.renderNav(); UI.rerender(); toast("Retiré de la playlist."); } }); }
   Menu.open(at, items);
 }
@@ -4612,7 +4714,7 @@ const ACTIONS = {
   like: (el) => { const c = rowCtx(el); if (c) toggleLike(c.id); },
   "like-current": () => toggleLike(Q.current),
   "like-many": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; const all = c.ids.every((id) => L.likes.has(id)); for (const id of c.ids) all ? L.likes.delete(id) : L.likes.add(id); saveLikes(); toast(all ? "Retiré des titres likés." : `${plural(c.ids.length, "titre liké", "titres likés")}.`); UI.renderNav(); UI.rerender(); },
-  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }]); },
+  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }, ...(el.dataset.ctx.startsWith("album:") ? ["sep", { icon: "pencil", label: "Modifier l'album", fn: () => Edit.openAlbum(el.dataset.ctx.slice(6)) }] : [])]); },
   sort: (el) => { const k = el.dataset.key; const s = UI.trackSort; UI.trackSort = k === "default" ? { key: "default", dir: 1 } : s.key === k ? { key: k, dir: -s.dir } : { key: k, dir: k === "plays" || k === "added" ? -1 : 1 }; store.set("trackSort", UI.trackSort); UI.rerender(); },
   "album-sort": (el) => { UI.albumSort = el.dataset.key; store.set("albumSort", UI.albumSort); UI.rerender(); },
   "album-genre": (el) => { UI.albumGenre = el.dataset.key || null; UI.rerender(); },
@@ -4666,6 +4768,8 @@ const ACTIONS = {
   "eq-open": () => openEq(),
   "eq-toggle": () => { Fx.setOn(!Fx.eqOn); openEq(); },
   "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
+  "edit-nopic": () => { const d = new FormData($("#edit-form")); Edit.reset(); Edit.dropPic = true; Edit.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), ""); },
+  "edit-undo": () => Edit.undo(),
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -4942,7 +5046,7 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit };
 boot();
 
 })();

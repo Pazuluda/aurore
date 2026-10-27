@@ -45,6 +45,7 @@ function trackMenu(at, id, list) {
   if (t.albumKey && !(UI.view.name === "album" && UI.view.param === t.albumKey)) items.push({ icon: "disc", label: "Aller à l'album", fn: () => UI.go("album", t.albumKey) });
   for (const a of t.artists.slice(0, 3)) items.push({ icon: "artist", label: `Aller à ${a}`, fn: () => UI.go("artist", norm(a)) });
   items.push({ icon: "sparkles", label: "Artistes proches", fn: () => discoverFrom(t.artists[0]) });
+  items.push("sep", { icon: "pencil", label: "Modifier les infos", fn: () => Edit.openTrack(id) });
   if (list && list.opts.playlist) { const p = L.playlists.find((x) => x.id === list.opts.playlist); if (p) items.push("sep", { icon: "trash", label: "Retirer de cette playlist", fn: () => { p.ids = p.ids.filter((x) => x !== id); savePlaylists(); UI.renderNav(); UI.rerender(); toast("Retiré de la playlist."); } }); }
   Menu.open(at, items);
 }
@@ -78,7 +79,7 @@ const ACTIONS = {
   like: (el) => { const c = rowCtx(el); if (c) toggleLike(c.id); },
   "like-current": () => toggleLike(Q.current),
   "like-many": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; const all = c.ids.every((id) => L.likes.has(id)); for (const id of c.ids) all ? L.likes.delete(id) : L.likes.add(id); saveLikes(); toast(all ? "Retiré des titres likés." : `${plural(c.ids.length, "titre liké", "titres likés")}.`); UI.renderNav(); UI.rerender(); },
-  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }]); },
+  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }, ...(el.dataset.ctx.startsWith("album:") ? ["sep", { icon: "pencil", label: "Modifier l'album", fn: () => Edit.openAlbum(el.dataset.ctx.slice(6)) }] : [])]); },
   sort: (el) => { const k = el.dataset.key; const s = UI.trackSort; UI.trackSort = k === "default" ? { key: "default", dir: 1 } : s.key === k ? { key: k, dir: -s.dir } : { key: k, dir: k === "plays" || k === "added" ? -1 : 1 }; store.set("trackSort", UI.trackSort); UI.rerender(); },
   "album-sort": (el) => { UI.albumSort = el.dataset.key; store.set("albumSort", UI.albumSort); UI.rerender(); },
   "album-genre": (el) => { UI.albumGenre = el.dataset.key || null; UI.rerender(); },
@@ -132,6 +133,8 @@ const ACTIONS = {
   "eq-open": () => openEq(),
   "eq-toggle": () => { Fx.setOn(!Fx.eqOn); openEq(); },
   "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
+  "edit-nopic": () => { const d = new FormData($("#edit-form")); Edit.reset(); Edit.dropPic = true; Edit.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), ""); },
+  "edit-undo": () => Edit.undo(),
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -408,5 +411,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit };
 boot();
