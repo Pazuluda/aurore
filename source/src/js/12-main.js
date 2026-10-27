@@ -55,6 +55,7 @@ const ACTIONS = {
   "import-dir": (el) => {
     if (NATIVE_WIN) return Menu.open(el, [{ icon: "plus", label: "Ajouter des titres…", fn: () => $("#pick-files").click() }, { icon: "files", label: "Suivre un dossier existant…", fn: () => nativePickFolder() }, "sep", { icon: "folder", label: "Ouvrir mon dossier aurore", fn: () => openLibraryFolder() }]);
     if (!IS_MOBILE) return openFolder();
+    if (AndroidMusic) return Menu.open(el, [{ icon: "search", label: "Rechercher la musique du téléphone", fn: () => AndroidMusic.find() }, { icon: "files", label: "Choisir des fichiers…", fn: () => $("#pick-files").click() }]);
     if (IS_IOS || CAP) return $("#pick-files").click();
     Menu.open(el, [{ icon: "files", label: "Choisir des titres", fn: () => $("#pick-files").click() }, { icon: "folder", label: "Choisir un dossier entier", fn: () => $("#pick-dir").click() }]);
   },
@@ -118,6 +119,7 @@ const ACTIONS = {
   "drop-missing": () => { const ids = [...L.tracks.keys()].filter((id) => !L.files.has(id) && !L.tracks.get(id).demo); removeTracks(ids); UI.onLibraryChanged(); toast(`${plural(ids.length, "titre retiré", "titres retirés")} de la bibliothèque.`); },
   "folder-add": async () => { closeSheet(); await nativePickFolder(); },
   "open-library": () => openLibraryFolder(),
+  "media-find": () => AndroidMusic && AndroidMusic.find(),
   "pick-folder": () => nativePickFolder(),
   "open-folder": (el) => NATIVE_WIN.openPath(el.dataset.dir),
   "paths-copy": () => { const p = UI.pendingPaths || []; UI.pendingPaths = null; closeSheet(); nativeImportPaths(p, "copy"); },
@@ -165,7 +167,8 @@ ${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div sty
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${L.memorize}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
 <div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${Viz.calm}" data-act="set-calm" aria-label="Animations douces"></button></div>
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
-<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>
+${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
+${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b><p>La même app, sans navigateur : installateur pour ton PC et APK pour ton téléphone.</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`}
 ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP_VERSION}</b><p>${NATIVE_WIN ? "aurore vérifie les mises à jour à chaque démarrage et les télécharge toute seule." : "aurore vérifie les mises à jour à chaque démarrage."}</p></div><button class="btn sm" data-act="upd-check">${icon("refresh", "sm")} Rechercher</button></div>` : ""}
 <div class="set-row"><div><b>Vider la bibliothèque</b><p>${NATIVE_WIN ? "Oublie tes dossiers, les titres et les pochettes. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur." : CAP ? "Oublie les titres, pochettes et copies gardées dans l'app. Tes playlists, likes et statistiques restent. Les fichiers de ton téléphone ne sont pas touchés." : "Oublie les titres, pochettes et copies. Tes playlists, likes et statistiques restent. Rien n'est supprimé de ton ordinateur."}</p></div>${UI.confirmClear ? html`<span style="display:flex;gap:6px"><button class="btn sm danger" data-act="set-clear-yes">Vider</button><button class="btn sm ghost" data-act="set-clear-no">Annuler</button></span>` : html`<button class="btn sm danger" data-act="set-clear">Vider</button>`}</div>
@@ -315,6 +318,7 @@ async function boot() {
   UI.bindImmGestures();
   Install.init();
   window.addEventListener("popstate", () => UI.onPop());
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && AndroidMusic && AndroidMusic.perm === "granted" && Date.now() - AndroidMusic.lastScan > 30000) AndroidMusic.scan({ quiet: true }); });
   if (CAP) { $("#pick-files").accept = "audio/*"; L.memorize = true; }
   if (NATIVE_WIN) {
     NATIVE_WIN.onOpenFiles(openNativeFiles);
@@ -350,5 +354,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic };
 boot();

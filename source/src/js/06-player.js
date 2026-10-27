@@ -73,12 +73,17 @@ const Player = {
   async load(id, { autoplay = true, startAt = 0 } = {}) {
     const f = L.files.get(id); if (!f) return false;
     const token = ++this.token;
-    let blob;
-    try { blob = await asBlob(f); } catch { this.emit("error", id); return false; }
-    if (token !== this.token) return false;
+    let src;
+    if (f.url) src = f.url; /* fichier du téléphone : lu en continu, sans copie en mémoire */
+    else {
+      let blob;
+      try { blob = await asBlob(f); } catch { this.emit("error", id); return false; }
+      src = URL.createObjectURL(blob);
+    }
+    if (token !== this.token) { if (!f.url) URL.revokeObjectURL(src); return false; }
     this.stopBuffer(); this.buf = null;
-    if (this.url) URL.revokeObjectURL(this.url);
-    this.url = URL.createObjectURL(blob);
+    if (this.url && this.url.startsWith("blob:")) URL.revokeObjectURL(this.url);
+    this.url = src;
     this.id = id; this.loading = true; this.triedBuffer = false;
     this.emit("track", id);
     if (this.preferBuffer) return this.loadBuffer(id, token, autoplay, startAt);

@@ -252,6 +252,7 @@ async function importEntries(entries, opts = {}) {
       const e = todo[idx++];
       let meta = {};
       try { meta = await parseAudioFile(e.file); } catch { meta = {}; }
+      if (e.hint) for (const k in e.hint) if (!meta[k] && e.hint[k]) meta[k] = e.hint[k]; /* infos d'Android quand le fichier n'en a pas */
       const guess = inferFromPath(e.path);
       const title = (meta.title || guess.title || e.file.name).trim();
       const artist = (meta.artist || guess.artist || meta.albumArtist || guess.dirArtist || UNKNOWN_ARTIST).trim();
@@ -267,7 +268,7 @@ async function importEntries(entries, opts = {}) {
         track: cleanNum(meta.track || guess.track), disc: cleanNum(meta.disc || guess.disc) || 1,
         duration: meta.duration && isFinite(meta.duration) ? meta.duration : 0,
         codec: meta.codec || extOf(e.file.name).toUpperCase(), sampleRate: meta.sampleRate || 0, bitrate: meta.bitrate || 0,
-        addedAt: now + idx,
+        addedAt: now + idx, src: e.file.media ? "media" : e.file.disk ? "disk" : "file",
       };
       if (!artDone.has(t.artKey)) {
         let src = null;
@@ -408,6 +409,7 @@ async function openFolder() {
 /* app installée sur PC : si le navigateur se souvient de l'autorisation, on rattache le dossier sans rien demander */
 async function autoReattach() {
   if (NATIVE_WIN) return nativeScan({ quiet: true });
+  if (AndroidMusic) return AndroidMusic.boot();
   const h = L.dirHandle;
   if (!h || !canPickDir() || !missingCount()) return;
   try {

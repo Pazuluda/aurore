@@ -85,6 +85,65 @@ async function nativeImportPaths(paths, mode) {
   if (!r.copied && !r.linked) toast("Déjà dans ta bibliothèque.");
 }
 
+/* Android : toute la musique du téléphone, comme les autres lecteurs (module AuroreMusic → MediaStore) */
+class MediaFile {
+  constructor(o) { this.mid = o.id; this.name = o.name; this.size = o.size; this.lastModified = o.mtime || 0; this.type = o.mime || MIME[extOf(o.name)] || ""; this.url = "/_aurore_media_/" + o.id; this.disk = true; this.media = true; }
+  async read(s, e) {
+    const r = await fetch(this.url, { headers: { Range: `bytes=${s}-${e - 1}` } });
+    if (!r.ok && r.status !== 206) throw new Error("lecture impossible");
+    const ab = await r.arrayBuffer();
+    return r.status === 206 ? ab : ab.slice(s, e);
+  }
+  slice(s = 0, e = this.size) { const a = Math.max(0, s), b = Math.min(this.size, e); return { arrayBuffer: () => (b > a ? this.read(a, b) : Promise.resolve(new ArrayBuffer(0))) }; }
+  async arrayBuffer() { return (await fetch(this.url)).arrayBuffer(); }
+  async blob() { return new Blob([await this.arrayBuffer()], { type: this.type }); }
+}
+const SKIP_MEDIA = /(^|\/)(WhatsApp|Telegram|Recordings?|Call ?recordings?|Enregistrements?|Voice ?Recorder|Notifications|Ringtones|Alarms|Sonneries|Android\/(data|media))(\/|$)/i;
+const AndroidMusic = CAP ? {
+  busy: false, again: false, lastScan: 0, perm: "", count: 0,
+  call(m, o) { return CAP.nativePromise("AuroreMusic", m, o || {}); },
+  async status() { try { const r = await this.call("status"); this.perm = r.permission; } catch { this.perm = "unavailable"; } return this.perm; },
+  async request() { try { const r = await this.call("request"); this.perm = r.permission; } catch { this.perm = "denied"; } store.set("askedMedia", true); UI.rerender(); return this.perm; },
+  /* au démarrage : demande l'autorisation une fois, puis cherche la musique à chaque lancement */
+  async boot() {
+    const st = await this.status();
+    if (st === "unavailable") return;
+    if (st === "granted") return this.scan({ quiet: true });
+    if (!store.get("askedMedia", false)) { const r = await this.request(); if (r === "granted") return this.scan({ quiet: false }); }
+    UI.rerender();
+  },
+  async find() {
+    let st = await this.status();
+    if (st !== "granted") st = await this.request();
+    if (st === "granted") return this.scan({ quiet: false });
+    toast("aurore n'a pas accès à ta musique.", { action: { label: "Autoriser", fn: () => this.call("openSettings").catch(() => {}) }, ms: 9000 });
+  },
+  async scan({ quiet = false } = {}) {
+    if (this.busy || L.importing) { this.again = true; return; }
+    this.busy = true; this.lastScan = Date.now();
+    try {
+      let items;
+      try { items = (await this.call("scan")).items || []; } catch { return; }
+      items = items.filter((o) => o && o.name && AUDIO_EXT.has(extOf(o.name)) && !SKIP_MEDIA.test(o.path || "") && !(o.duration > 0 && o.duration < 15000));
+      this.count = items.length;
+      const seen = new Set(items.map((o) => "t" + hash(o.path + "|" + o.size)));
+      const gone = [...L.tracks.values()].filter((t) => t.src === "media" && !seen.has(t.id)).map((t) => t.id);
+      if (gone.length) { removeTracks(gone); UI.onLibraryChanged(); }
+      if (!items.length) { if (!quiet) toast("Aucune musique trouvée sur le téléphone. Tu peux choisir des fichiers à la main."); return; }
+      const bad = (v) => !v || /^<unknown>$/i.test(v);
+      const entries = items.map((o) => {
+        const base = o.name.replace(/\.[^.]+$/, "");
+        return { file: new MediaFile(o), path: o.path, hint: { title: bad(o.title) || o.title === base ? "" : o.title, artist: bad(o.artist) ? "" : o.artist, album: bad(o.album) ? "" : o.album, year: o.year ? String(o.year) : "", track: o.track ? String(o.track % 1000) : "", duration: o.duration ? o.duration / 1000 : 0 } };
+      });
+      await importEntries(entries, { quiet: true });
+    } finally {
+      this.busy = false;
+      UI.renderNav(); if (UI.view.name === "home") UI.rerender();
+      if (this.again) { this.again = false; setTimeout(() => this.scan({ quiet: true }), 500); }
+    }
+  },
+} : null;
+
 /* Android : notification de lecture + commandes écran verrouillé (module MediaSession) */
 const NativeMedia = CAP ? {
   bound: false, art: new Map(), lastPos: 0,
