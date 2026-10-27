@@ -141,7 +141,7 @@ ${statsHTML()}
     const ids = sortedTrackIds(UI.trackSort);
     let dur = 0; for (const id of ids) dur += L.tracks.get(id).duration || 0;
     return html`<div class="view-head"><div><h1 class="h-page">Titres</h1><div class="sub">${plural(ids.length, "titre", "titres")} · ${fmtLong(dur)}</div></div>
-<div class="actions" style="padding:0"><button class="play-big" data-act="play-ctx" data-ctx="tracks" data-play-ctx="tracks" aria-label="Tout lire">${icon(Player.playing && Q.ref === "tracks" ? "pause" : "play")}</button><button class="icon-btn" data-act="shuffle-ctx" data-ctx="tracks" aria-label="Tout lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>${UI.trackSort.key !== "default" ? html`<button class="btn sm ghost" data-act="sort" data-key="default">Ordre par artiste</button>` : ""}</div></div>
+<div class="actions" style="padding:0"><button class="play-big" data-act="play-ctx" data-ctx="tracks" data-play-ctx="tracks" aria-label="Tout lire">${icon(Player.playing && Q.ref === "tracks" ? "pause" : "play")}</button><button class="icon-btn" data-act="shuffle-ctx" data-ctx="tracks" aria-label="Tout lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button><button class="icon-btn" data-act="ctx-menu" data-ctx="tracks" aria-label="Plus d'options">${icon("more")}</button>${UI.trackSort.key !== "default" ? html`<button class="btn sm ghost" data-act="sort" data-key="default">Ordre par artiste</button>` : ""}</div></div>
 ${trackList(ids, { sort: UI.trackSort, label: "Tous les titres", ref: "tracks" })}`;
   },
 
@@ -197,7 +197,7 @@ ${others.length ? shelf(`Plus de ${a.artist}`, others.map(albumCard)) : ""}`;
 <div class="dhead-line"><span>${plural(ids.length, "titre", "titres")}</span>${own.length ? html`<span class="dot">${plural(own.length, "album", "albums")}</span>` : ""}${plays ? html`<span class="dot">écouté ${plural(plays, "fois", "fois")}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire ${ar.name}">${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
-<button class="btn" data-act="discover-from" data-key="${ar.name}">${icon("sparkles", "sm")} Artistes proches</button></div>
+<button class="btn" data-act="discover-from" data-key="${ar.name}">${icon("sparkles", "sm")} Artistes proches</button><button class="icon-btn" data-act="ctx-menu" data-ctx="${ref}" aria-label="Plus d'options">${icon("more")}</button></div>
 <section class="sec" style="margin-top:12px"><div class="sec-head"><h2 class="h-sec">${plays ? "Populaires chez toi" : "Titres"}</h2>${ids.length > 6 ? html`<button class="link" data-act="artist-all" data-key="${key}">${showAll ? "Afficher moins" : `Afficher les ${ids.length}`}</button>` : ""}</div>
 ${trackList(showAll ? ids : ids.slice(0, 6), { label: ar.name, ref })}</section>
 ${own.length ? html`<section class="sec"><div class="sec-head"><h2 class="h-sec">Discographie</h2></div><div class="grid">${own.map((a) => albumCard(a.key))}</div></section>` : ""}
@@ -217,7 +217,7 @@ ${feat.length ? shelf("Apparaît sur", feat.map((a) => albumCard(a.key))) : ""}`
 <div class="dhead-line"><span>${plural(s.ids.length, "titre", "titres")}</span>${dur ? html`<span class="dot">${fmtLong(dur)}</span>` : ""}</div></div></header>
 <div class="actions"><button class="play-big" data-act="play-ctx" data-ctx="${ref}" data-play-ctx="${ref}" aria-label="Lire" ${raw(s.ids.length ? "" : "disabled")}>${icon(Player.playing && Q.ref === ref ? "pause" : "play")}</button>
 <button class="icon-btn" data-act="shuffle-ctx" data-ctx="${ref}" aria-label="Lire en aléatoire" title="Aléatoire">${icon("shuffle")}</button>
-${s.p ? html`<button class="icon-btn" data-act="list-menu" data-id="${id}" aria-label="Options de la playlist">${icon("more")}</button>` : ""}
+${s.p ? html`<button class="icon-btn" data-act="list-menu" data-id="${id}" aria-label="Options de la playlist">${icon("more")}</button>` : s.ids.length ? html`<button class="icon-btn" data-act="ctx-menu" data-ctx="${ref}" aria-label="Plus d'options">${icon("more")}</button>` : ""}
 ${UI.confirmDelete === id ? html`<span class="confirm">Supprimer « ${s.name} » ?<button class="btn sm danger" data-act="delete-list" data-id="${id}">Supprimer</button><button class="btn sm ghost" data-act="cancel-delete">Annuler</button></span>` : ""}</div>
 ${s.ids.length ? trackList(s.ids, { label: s.name, ref, playlist: s.p ? id : null }) : html`<div class="empty" style="padding-top:30px"><p>${s.empty}</p><button class="btn" data-act="nav" data-view="tracks">Parcourir mes titres</button></div>`}`;
   },

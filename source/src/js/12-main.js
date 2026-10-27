@@ -33,6 +33,13 @@ function addToPlaylist(p, ids) {
 function playlistSub(ids) {
   return () => [{ title: "Ajouter à…" }, { icon: "plus", label: "Nouvelle playlist", fn: () => { const p = newPlaylist(ids, false); toast(`Playlist « ${p.name} » créée.`, { action: { label: "Ouvrir", fn: () => UI.go("list", p.id) } }); } }, ...(L.playlists.length ? ["sep"] : []), ...L.playlists.map((p) => ({ icon: "music", label: p.name, fn: () => addToPlaylist(p, ids) }))];
 }
+/* envoyer plusieurs titres d'un coup (album, playlist, artiste, humeur…) */
+function sendItems(ids) {
+  const out = [];
+  if (LanPC && LanPC.hasPhone) { const n = ids.filter((id) => L.files.get(id)?.abs).length; if (n) out.push({ icon: "send", label: `Envoyer au téléphone (${n})`, fn: () => LanPC.send(ids) }); }
+  if (LanPhone && LanPhone.pc) { const n = ids.filter((id) => L.files.get(id)?.media).length; if (n) out.push({ icon: "send", label: `Envoyer au PC (${n})`, fn: () => LanPhone.send(ids) }); }
+  return out.length ? ["sep", ...out] : [];
+}
 function trackMenu(at, id, list) {
   const t = L.tracks.get(id); if (!t) return;
   const items = [
@@ -81,7 +88,7 @@ const ACTIONS = {
   like: (el) => { const c = rowCtx(el); if (c) toggleLike(c.id); },
   "like-current": () => toggleLike(Q.current),
   "like-many": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; const all = c.ids.every((id) => L.likes.has(id)); for (const id of c.ids) all ? L.likes.delete(id) : L.likes.add(id); saveLikes(); toast(all ? "Retiré des titres likés." : `${plural(c.ids.length, "titre liké", "titres likés")}.`); UI.renderNav(); UI.rerender(); },
-  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }, ...(el.dataset.ctx.startsWith("album:") ? ["sep", { icon: "pencil", label: "Modifier l'album", fn: () => Edit.openAlbum(el.dataset.ctx.slice(6)) }] : [])]); },
+  "ctx-menu": (el) => { const c = ctxResolve(el.dataset.ctx); if (!c) return; Menu.open(el, [{ icon: "playnext", label: "Lire ensuite", fn: () => { Q.addNext(c.ids); toast("Sera lu juste après."); } }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { Q.addEnd(c.ids); toast(`${plural(c.ids.length, "titre ajouté", "titres ajoutés")} à la file.`); } }, { icon: "plus", label: "Ajouter à une playlist", sub: playlistSub(c.ids) }, ...sendItems(c.ids), ...(el.dataset.ctx.startsWith("album:") ? ["sep", { icon: "pencil", label: "Modifier l'album", fn: () => Edit.openAlbum(el.dataset.ctx.slice(6)) }] : [])]); },
   sort: (el) => { const k = el.dataset.key; const s = UI.trackSort; UI.trackSort = k === "default" ? { key: "default", dir: 1 } : s.key === k ? { key: k, dir: -s.dir } : { key: k, dir: k === "plays" || k === "added" ? -1 : 1 }; store.set("trackSort", UI.trackSort); UI.rerender(); },
   "album-sort": (el) => { UI.albumSort = el.dataset.key; store.set("albumSort", UI.albumSort); UI.rerender(); },
   "album-genre": (el) => { UI.albumGenre = el.dataset.key || null; UI.rerender(); },
@@ -112,7 +119,7 @@ const ACTIONS = {
   noop: () => {},
   "new-playlist": () => newPlaylist(),
   "rename-list": (el) => { UI.editing = el.dataset.id; UI.render(); const i = $("#pl-title"); if (i) { i.focus(); i.select(); } },
-  "list-menu": (el) => { const id = el.dataset.id; Menu.open(el, [{ icon: "pencil", label: "Renommer", fn: () => ACTIONS["rename-list"]({ dataset: { id } }) }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { const s = listSpec(id); Q.addEnd(s.ids); toast("Ajouté à la file d'attente."); } }, "sep", { icon: "trash", label: "Supprimer la playlist", fn: () => { UI.confirmDelete = id; UI.rerender(); } }]); },
+  "list-menu": (el) => { const id = el.dataset.id; Menu.open(el, [{ icon: "pencil", label: "Renommer", fn: () => ACTIONS["rename-list"]({ dataset: { id } }) }, { icon: "addq", label: "Ajouter à la file d'attente", fn: () => { const s = listSpec(id); Q.addEnd(s.ids); toast("Ajouté à la file d'attente."); } }, ...sendItems(listSpec(id).ids), "sep", { icon: "trash", label: "Supprimer la playlist", fn: () => { UI.confirmDelete = id; UI.rerender(); } }]); },
   "delete-list": (el) => { const id = el.dataset.id; const p = L.playlists.find((x) => x.id === id); L.playlists = L.playlists.filter((x) => x.id !== id); savePlaylists(); UI.confirmDelete = null; UI.stack = []; UI.go("home", null, { push: false }); toast(`Playlist « ${p ? p.name : ""} » supprimée.`, { action: { label: "Annuler", fn: () => { if (p) { L.playlists.push(p); savePlaylists(); UI.renderNav(); } } } }); },
   "cancel-delete": () => { UI.confirmDelete = null; UI.rerender(); },
   "disc-run": (el) => Disc.run(el.dataset.fresh === "1"),
