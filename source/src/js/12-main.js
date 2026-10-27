@@ -92,7 +92,14 @@ const ACTIONS = {
   immersive: () => UI.openImm(),
   "open-imm-phone": () => { if (isPhone() && Q.current) UI.openImm(); },
   "close-imm": () => UI.closeImm(),
-  "viz-mode": (el) => { Viz.mode = el.dataset.mode; store.set("vizMode", Viz.mode); Viz.particles.length = 0; const c = $("#imm canvas"); if (c) c.getContext("2d").clearRect(0, 0, c.width, c.height); for (const b of $$("#imm [data-act='viz-mode']")) b.setAttribute("aria-pressed", b.dataset.mode === Viz.mode); Viz.kick(); },
+  "viz-mode": (el) => {
+    Viz.mode = el.dataset.mode; store.set("vizMode", Viz.mode); Viz.particles.length = 0; Viz.sparks.length = 0; Viz.land.length = 0;
+    const c = $("#imm canvas"); if (c) c.getContext("2d").clearRect(0, 0, c.width, c.height);
+    for (const b of $$("#imm [data-act='viz-mode']")) b.setAttribute("aria-pressed", b.dataset.mode === Viz.mode);
+    const m = VIZ_MODES.find((x) => x[0] === Viz.mode), p = $("#imm .viz-pick"); if (p && m) setHTML(p, html`${icon(m[2], "sm")}<span>${m[1]}</span>`);
+    Viz.kick();
+  },
+  "viz-menu": (el) => Menu.open(el, [{ title: "Visualiseur" }, ...VIZ_MODES.map(([k, l, ic]) => ({ icon: Viz.mode === k ? "check" : ic, label: l, fn: () => ACTIONS["viz-mode"]({ dataset: { mode: k } }) }))]),
   "imm-queue": () => { UI.immQueue = !UI.immQueue; UI.renderImmQueue(); const b = $("#imm [data-act='imm-queue']"); if (b) { b.classList.toggle("on", UI.immQueue); b.setAttribute("aria-pressed", UI.immQueue); } },
   "q-jump": (el) => Q.jumpTo(+el.dataset.pos),
   "q-manual": (el) => Q.playManual(+el.dataset.i),
@@ -115,6 +122,8 @@ const ACTIONS = {
   "close-sheet": () => closeSheet(),
   "set-memo": () => { L.memorize = !L.memorize; DB.put("kv", "memorize", L.memorize); store.set("askedMemo", true); if (L.memorize) { memorizeFiles(); toast("Ta musique sera gardée dans le lecteur."); } else { forgetFiles(); toast("Copie supprimée. Ton dossier reste la source."); } openSettings(); UI.onLibraryProgress(); },
   "set-calm": () => { setCalm(!Viz.calm); openSettings(); },
+  "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
+  "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
   "drop-missing": () => { const ids = [...L.tracks.keys()].filter((id) => !L.files.has(id) && !L.tracks.get(id).demo); removeTracks(ids); UI.onLibraryChanged(); toast(`${plural(ids.length, "titre retiré", "titres retirés")} de la bibliothèque.`); },
   "folder-add": async () => { closeSheet(); await nativePickFolder(); },
@@ -163,6 +172,11 @@ async function openSettings() {
   const folders = NATIVE_WIN ? await NATIVE_WIN.getFolders().catch(() => []) : null;
   openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Réglages</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div>
 <div style="margin-top:10px">
+<div class="set-row theme-row"><div style="min-width:0;flex:1"><b>Fond</b>
+  <div class="theme-bgs" role="radiogroup" aria-label="Fond">${BACKGROUNDS.map(([k, l, d]) => html`<button class="theme-bg tb-${k}" role="radio" aria-checked="${Theme.bg === k}" data-act="theme-bg" data-v="${k}"><span class="tb-prev" aria-hidden="true"><i></i><i></i><i></i></span><b>${l}</b><small>${d}</small></button>`)}</div>
+  <b style="display:block;margin-top:16px">Couleurs</b><p>${Theme.accent === "pochette" ? "Elles changent avec la pochette du titre en cours." : "Les mêmes couleurs pour tous les titres."}</p>
+  <div class="theme-acc" role="radiogroup" aria-label="Couleurs">${Object.entries(ACCENTS).map(([k, a]) => html`<button role="radio" aria-checked="${Theme.accent === k}" data-act="theme-accent" data-v="${k}" title="${a.name}"><span class="sw${k === "pochette" ? " auto" : ""}" style="${a.c1 ? `background:conic-gradient(${a.c1} 0 120deg, ${a.c2} 0 240deg, ${a.c3} 0)` : ""}"></span><small>${a.name}</small></button>`)}</div>
+</div></div>
 ${NATIVE_WIN ? html`<div class="set-row" style="align-items:flex-start"><div style="min-width:0;flex:1"><b>Mes dossiers de musique</b><p>aurore les surveille : ajoute ou supprime de la musique dedans, la bibliothèque suit toute seule.</p>${folders.map((d) => { const lib = d === NATIVE_LIBRARY; return html`<div class="folder-row"><span class="mono" title="${d}">${lib ? html`<b>Dossier aurore</b> · ` : ""}${d}</span><button class="icon-btn" data-act="open-folder" data-dir="${d}" aria-label="Ouvrir dans l'Explorateur" title="Ouvrir dans l'Explorateur">${icon("external", "sm")}</button>${lib ? "" : html`<button class="icon-btn" data-act="folder-remove" data-dir="${d}" aria-label="Ne plus suivre ce dossier" title="Ne plus suivre">${icon("x", "sm")}</button>`}</div>`; })}</div><button class="btn sm" data-act="folder-add">${icon("plus", "sm")} Suivre un dossier</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le lecteur</b><p>Copie tes fichiers (${bytes ? fmtBytes(bytes) : "0 Ko"}) dans le stockage du navigateur pour ne plus avoir à rouvrir ton dossier. Tes originaux ne bougent pas.${L.memorizing ? ` En cours : ${L.memorizing.done}/${L.memorizing.total}.` : ""}</p></div><button class="switch" role="switch" aria-checked="${L.memorize}" data-act="set-memo" aria-label="Garder ma musique dans le lecteur"></button></div>`}
 <div class="set-row"><div><b>Animations douces</b><p>Fond fixe, pochette qui ne tourne plus, pas de pulsation. Le spectre reste.</p></div><button class="switch" role="switch" aria-checked="${Viz.calm}" data-act="set-calm" aria-label="Animations douces"></button></div>
@@ -175,7 +189,7 @@ ${IS_NATIVE ? html`<div class="set-row"><div><b>Version ${Updates.current || APP
 </div>`);
 }
 function openKeys() {
-  const k = [["Espace", "Lecture / pause"], ["→ / ←", "Avancer / reculer de 5 s"], ["Maj + → / ←", "Titre suivant / précédent"], ["Ctrl + ↑ / ↓", "Volume"], ["M", "Couper le son"], ["S", "Aléatoire"], ["R", "Répéter"], ["L", "Liker le titre en cours"], ["F", "Mode immersif"], ["1 · 2 · 3", "Visualiseur : halo, spectre, onde"], ["/", "Rechercher"], ["Échap", "Fermer"]];
+  const k = [["Espace", "Lecture / pause"], ["→ / ←", "Avancer / reculer de 5 s"], ["Maj + → / ←", "Titre suivant / précédent"], ["Ctrl + ↑ / ↓", "Volume"], ["M", "Couper le son"], ["S", "Aléatoire"], ["R", "Répéter"], ["L", "Liker le titre en cours"], ["F", "Mode immersif"], ["1 à 6", "Visualiseur : halo, spectre, onde, paysage, éclats, rétro"], ["/", "Rechercher"], ["Échap", "Fermer"]];
   openSheet(html`<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>Raccourcis</h2><button class="icon-btn" data-act="close-sheet" aria-label="Fermer">${icon("x")}</button></div><div class="keys">${k.map(([a, b]) => html`<kbd>${a}</kbd><span>${b}</span>`)}</div>`);
 }
 
@@ -228,7 +242,7 @@ function bindEvents() {
     else if (k === "f" || k === "F") UI.imm ? UI.closeImm() : UI.openImm();
     else if (k === "/") { e.preventDefault(); $("#q").focus(); }
     else if (k === "?") openKeys();
-    else if (UI.imm && ["1", "2", "3"].includes(k)) ACTIONS["viz-mode"]({ dataset: { mode: ["halo", "spectre", "onde"][+k - 1] } });
+    else if (UI.imm && ["1", "2", "3", "4", "5", "6"].includes(k)) ACTIONS["viz-mode"]({ dataset: { mode: VIZ_MODES[+k - 1][0] } });
   });
   document.addEventListener("focusout", (e) => {
     if (e.target.id === "pl-title") {
@@ -304,6 +318,7 @@ async function boot() {
   setHTML($("#drop-ic"), icon("folder"));
   for (const el of $$("[data-act='import-dir']")) if (!el.closest("#view")) setHTML(el, html`${icon("folder", "sm")}<span class="lbl">Ajouter de la musique</span>`);
   setCalm(store.get("calm", matchMedia("(prefers-reduced-motion: reduce)").matches));
+  Theme.apply();
   Player.init();
   UI.buildDock();
   UI.toggleNP(UI.npOpen);
@@ -355,5 +370,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet };
 boot();

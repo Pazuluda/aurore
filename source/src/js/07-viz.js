@@ -97,6 +97,8 @@ const Viz = {
     const alive = this.compute();
     const pulse = this.calm ? 0 : clamp(this.bass * .6 + this.beat * .5, 0, 1.2);
     const ap = document.getElementById("aurora-pulse"); if (ap) ap.style.setProperty("--pulse", pulse.toFixed(3));
+    const im = UI.imm && document.getElementById("imm"); /* pochette et fond du plein écran qui bougent avec la musique */
+    if (im) { im.style.setProperty("--beat", (this.calm ? 0 : this.beat).toFixed(3)); im.style.setProperty("--bass", (this.calm ? 0 : this.bass).toFixed(3)); }
     const mk = document.getElementById("brand-mark");
     if (mk) { const s = mk.children; for (let i = 0; i < s.length; i++) s[i].style.height = Math.round(30 + 70 * (Player.playing ? this.bands[6 + i * 14] : (.2 + i * .12))) + "%"; }
     if (this.coverSpin && Player.playing && !this.calm) this.coverAngle += .0025;
@@ -112,8 +114,13 @@ const Viz = {
     if (t.kind === "lcd") this.drawLcd(g, w, h);
     else if (t.kind === "panel") this.drawPanel(g, w, h);
     else if (t.kind === "hero") this.drawHero(g, w, h, useIdle || (!Player.playing && this.bands[10] < .01));
-    else if (t.kind === "imm") { if (this.mode === "halo") this.drawHalo(g, w, h); else if (this.mode === "onde") this.drawWave(g, w, h); else this.drawSpectre(g, w, h); }
+    else if (t.kind === "imm") {
+      const m = this.mode;
+      if (m === "halo") this.drawHalo(g, w, h); else if (m === "onde") this.drawWave(g, w, h); else if (m === "paysage") this.drawLand(g, w, h);
+      else if (m === "eclats") this.drawBurst(g, w, h); else if (m === "retro") this.drawRetro(g, w, h); else this.drawSpectre(g, w, h);
+    }
   },
+  peakCol() { return document.documentElement.classList.contains("th-clair") ? "rgba(30,22,70,.75)" : "rgba(255,255,255,.88)"; },
   sample(arr, x) { const i = clamp(x, 0, 1) * (arr.length - 1); const a = Math.floor(i), b = Math.min(arr.length - 1, a + 1); return lerp(arr[a], arr[b], i - a); },
   vgrad(g, h) {
     const gr = g.createLinearGradient(0, h, 0, 0);
@@ -131,7 +138,7 @@ const Viz = {
       const segs = Math.floor((v * h) / (seg + sg));
       for (let s = 0; s < segs; s++) g.fillRect(x, h - (s + 1) * (seg + sg) + sg, bw, seg);
       const p = this.sample(this.peaks, (i + .5) / n * .82);
-      if (p > .02) { g.save(); g.fillStyle = "rgba(255,255,255,.85)"; g.fillRect(x, h - p * h - 1, bw, 1.5); g.restore(); }
+      if (p > .02) { g.save(); g.fillStyle = this.peakCol(); g.fillRect(x, h - p * h - 1, bw, 1.5); g.restore(); }
     }
     if (!Player.playing && this.bands[4] < .01) { g.fillStyle = this.rgba(this.col.c1, .35); for (let i = 0; i < n; i++) g.fillRect(i * (bw + gap), h - 2, bw, 2); }
   },
@@ -146,7 +153,7 @@ const Viz = {
     }
     g.globalAlpha = .18;
     for (let i = 0; i < n; i++) { const v = this.sample(this.bands, (i + .5) / n * .9), x = i * (bw + gap); g.fillRect(x, base + 2, bw, v * (h - base) * .9); }
-    g.globalAlpha = 1; g.fillStyle = "rgba(255,255,255,.9)";
+    g.globalAlpha = 1; g.fillStyle = this.peakCol();
     for (let i = 0; i < n; i++) { const p = this.sample(this.peaks, (i + .5) / n * .9); if (p > .03) g.fillRect(i * (bw + gap), base - p * base - 3, bw, 2); }
   },
   drawHero(g, w, h, idle) {
@@ -165,7 +172,7 @@ const Viz = {
   /* immersif : halo circulaire autour de la pochette */
   drawHalo(g, w, h) {
     g.clearRect(0, 0, w, h);
-    const cx = w / 2, cy = h * .42, R = Math.min(w * .21, h * .18) * (this.calm ? 1 : 1 + this.beat * .045);
+    const cx = w / 2, cy = h * .42, R = Math.min(w * .21, h * .18) * (this.calm ? 1 : 1 + this.beat * .06 + this.bass * .035);
     const glow = g.createRadialGradient(cx, cy, R * .6, cx, cy, R * 3.4);
     glow.addColorStop(0, this.rgba(this.col.c1, .22 + this.level * .25)); glow.addColorStop(1, this.rgba(this.col.c1, 0));
     g.fillStyle = glow; g.fillRect(0, 0, w, h);
@@ -224,6 +231,95 @@ const Viz = {
     for (let i = 0; i < n; i++) { const v = this.sample(this.bands, (i + .5) / n * .92); g.fillRect(x0 + i * (bw + gap), base + 4, bw, v * maxH * .35); }
     g.globalAlpha = 1; g.fillStyle = "rgba(255,255,255,.92)";
     for (let i = 0; i < n; i++) { const p = this.sample(this.peaks, (i + .5) / n * .92); if (p > .02) g.fillRect(x0 + i * (bw + gap), base - p * maxH - 6, bw, 3); }
+  },
+  /* paysage : montagnes de son qui défilent vers toi, soleil couchant qui pulse sur les basses */
+  land: [], stars: null,
+  drawLand(g, w, h) {
+    const H = h * .5, N = 56, ROWS = 34;
+    if (!this.stars) this.stars = Array.from({ length: 70 }, () => [Math.random(), Math.random() * .48, Math.random() * 1.4 + .3, Math.random() * 6]);
+    if (Player.playing || !this.land.length) {
+      const row = new Float32Array(N);
+      for (let i = 0; i < N; i++) { const x = Math.abs(i / (N - 1) * 2 - 1); const center = 1 - x; row[i] = this.sample(this.bands, center * .8) * (.25 + x * 1.1); }
+      this._landTick = (this._landTick || 0) + 1;
+      if (!this.land.length || this._landTick % 3 === 0) { this.land.unshift(row); if (this.land.length > ROWS) this.land.pop(); } else this.land[0] = row;
+    }
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, "#05040c"); sky.addColorStop(1, this.rgba(this.mix(this.col.c3, [8, 6, 20], .6), 1));
+    g.fillStyle = sky; g.fillRect(0, 0, w, H + 1);
+    g.fillStyle = "#05040c"; g.fillRect(0, H, w, h - H);
+    const now = performance.now() / 1000;
+    for (const [sx, sy, r, ph] of this.stars) { g.fillStyle = `rgba(255,255,255,${.25 + .35 * Math.sin(now * 1.3 + ph) ** 2})`; g.fillRect(sx * w, sy * h, r, r); }
+    const sr = Math.min(w, h) * .16 * (1 + this.bass * .12 + this.beat * .06), sy = H - sr * .25;
+    const sun = g.createLinearGradient(0, sy - sr, 0, sy + sr); sun.addColorStop(0, this.rgba(this.col.c2, 1)); sun.addColorStop(.55, this.rgba(this.col.c3, 1)); sun.addColorStop(1, this.rgba(this.col.c1, 1));
+    g.save(); g.beginPath(); g.arc(w / 2, sy, sr, 0, Math.PI * 2); g.clip(); g.fillStyle = sun; g.fillRect(w / 2 - sr, sy - sr, sr * 2, sr * 2);
+    g.fillStyle = "#05040c"; for (let k = 0; k < 6; k++) { const yy = sy + sr * (.1 + k * .16); g.fillRect(w / 2 - sr, yy, sr * 2, 1.5 + k * 1.3); }
+    g.restore();
+    const glow = g.createRadialGradient(w / 2, sy, sr, w / 2, sy, sr * 3); glow.addColorStop(0, this.rgba(this.col.c3, .25 + this.level * .2)); glow.addColorStop(1, this.rgba(this.col.c3, 0)); g.fillStyle = glow; g.fillRect(0, 0, w, h);
+    g.lineJoin = "round";
+    for (let r = this.land.length - 1; r >= 0; r--) {
+      const z = 1 + r * .45, sc = 1 / z, y0 = H + (h * .74 - H) * sc, spread = w * 1.25 * sc, amp = h * .2 * sc, row = this.land[r];
+      g.beginPath();
+      for (let i = 0; i < N; i++) { const x = w / 2 + (i / (N - 1) - .5) * spread, y = y0 - row[i] * amp; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.lineTo(w / 2 + spread / 2, h + 2); g.lineTo(w / 2 - spread / 2, h + 2); g.closePath();
+      g.fillStyle = "#05040c"; g.fill();
+      const fade = 1 - r / this.land.length;
+      g.strokeStyle = this.rgba(this.mix(this.col.c1, this.col.c2, r / this.land.length), .15 + fade * .85); g.lineWidth = .6 + fade * 1.8; g.stroke();
+    }
+  },
+  /* éclats : feux d'artifice sur chaque temps fort */
+  sparks: [],
+  drawBurst(g, w, h) {
+    g.globalCompositeOperation = "destination-out"; g.fillStyle = `rgba(0,0,0,${this.calm ? .5 : .16})`; g.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = "lighter";
+    const cx = w / 2, cy = h * .42, m = Math.min(w, h);
+    if (Player.playing && !this.calm) {
+      if (this.sinceBeat === 0 || (this.beat > .85 && this.sparks.length < 40)) {
+        const ox = cx + (Math.random() - .5) * w * .5, oy = cy + (Math.random() - .5) * h * .3, n = 50 + Math.round(this.level * 90), col = ["c1", "c2", "c3"][Math.floor(Math.random() * 3)];
+        for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, v = (1.5 + Math.random() * 4.5) * m / 700; this.sparks.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, c: Math.random() < .25 ? "c3" : col }); }
+      }
+      for (let k = 0; k < 1 + this.level * 2; k++) { const a = Math.random() * Math.PI * 2, r = m * (.06 + this.bass * .08); this.sparks.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, vx: Math.cos(a) * 1.2, vy: Math.sin(a) * 1.2, life: .45, c: "c2" }); }
+    }
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+      const p = this.sparks[i]; p.x += p.vx; p.y += p.vy; p.vy += .025; p.vx *= .985; p.vy *= .985; p.life -= .012;
+      if (p.life <= 0) { this.sparks.splice(i, 1); continue; }
+      g.fillStyle = this.rgba(this.col[p.c], p.life * .8); g.beginPath(); g.arc(p.x, p.y, .8 + p.life * 1.6, 0, Math.PI * 2); g.fill();
+    }
+    if (this.sparks.length > 1600) this.sparks.splice(0, this.sparks.length - 1600);
+    const R = m * (.03 + this.bass * .04 + this.beat * .02);
+    const orb = g.createRadialGradient(cx, cy, 0, cx, cy, R * 3); orb.addColorStop(0, this.rgba([255, 255, 255], .18 + this.level * .15)); orb.addColorStop(.3, this.rgba(this.col.c1, .14)); orb.addColorStop(1, this.rgba(this.col.c1, 0));
+    g.fillStyle = orb; g.beginPath(); g.arc(cx, cy, R * 3, 0, Math.PI * 2); g.fill();
+    g.globalCompositeOperation = "source-over";
+  },
+  /* rétro : l'afficheur des vieux lecteurs, LED vertes, jaunes, rouges et oscilloscope */
+  drawRetro(g, w, h) {
+    g.clearRect(0, 0, w, h);
+    const W = Math.min(w * .9, 760), Hh = Math.min(h * .5, W * .62), x0 = (w - W) / 2, y0 = h * .42 - Hh / 2;
+    g.fillStyle = "#020502"; g.strokeStyle = "rgba(120,255,140,.25)"; g.lineWidth = 2;
+    g.beginPath(); g.roundRect ? g.roundRect(x0, y0, W, Hh, 14) : g.rect(x0, y0, W, Hh); g.fill(); g.stroke();
+    g.save(); g.beginPath(); g.rect(x0 + 6, y0 + 6, W - 12, Hh - 12); g.clip();
+    g.strokeStyle = "rgba(60,160,70,.12)"; g.lineWidth = 1;
+    for (let x = x0; x < x0 + W; x += 22) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y0 + Hh); g.stroke(); }
+    for (let y = y0; y < y0 + Hh; y += 22) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + W, y); g.stroke(); }
+    const sh = Hh * .62, base = y0 + 14 + sh, n = Math.max(16, Math.min(32, Math.floor(W / 22))), gap = 4, bw = (W - 28 - gap * (n - 1)) / n, seg = 5, sg = 2, segs = Math.floor(sh / (seg + sg));
+    for (let i = 0; i < n; i++) {
+      const v = this.sample(this.bands, (i + .5) / n * .9), x = x0 + 14 + i * (bw + gap), on = Math.round(v * segs);
+      for (let s = 0; s < segs; s++) {
+        const f = s / segs, lit = s < on;
+        g.fillStyle = f > .82 ? (lit ? "#ff3b30" : "rgba(255,59,48,.08)") : f > .6 ? (lit ? "#ffd60a" : "rgba(255,214,10,.07)") : (lit ? "#3dff6e" : "rgba(61,255,110,.06)");
+        g.fillRect(x, base - (s + 1) * (seg + sg) + sg, bw, seg);
+      }
+      const p = Math.round(this.sample(this.peaks, (i + .5) / n * .9) * segs);
+      if (p > 0) { g.fillStyle = "#eaffea"; g.fillRect(x, base - p * (seg + sg) - 2, bw, 2); }
+    }
+    if (this.wave) {
+      const oy = base + (y0 + Hh - base) / 2, amp = (y0 + Hh - base) * .42;
+      g.strokeStyle = "rgba(61,255,110,.9)"; g.shadowColor = "#3dff6e"; g.shadowBlur = 8; g.lineWidth = 1.6; g.beginPath();
+      const L = this.wave.length;
+      for (let i = 0; i < 200; i++) { const v = Player.playing ? (this.wave[Math.floor(i / 200 * L)] - 128) / 128 : 0, x = x0 + 14 + (i / 199) * (W - 28), y = oy + v * amp; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke(); g.shadowBlur = 0;
+    }
+    g.fillStyle = "rgba(0,0,0,.18)"; for (let y = y0; y < y0 + Hh; y += 3) g.fillRect(x0, y, W, 1);
+    g.restore();
   },
   drawWave(g, w, h) {
     g.globalCompositeOperation = "destination-out"; g.fillStyle = "rgba(0,0,0,.26)"; g.fillRect(0, 0, w, h);

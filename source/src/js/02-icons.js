@@ -1,5 +1,10 @@
 /* ===================== icônes (tracés style Lucide) ===================== */
 const ICONS = {
+  mountain: '<path d="m2 20 7-11 4 6 3-4 6 9z"/><circle cx="17" cy="6" r="2"/>',
+  burst: '<path d="M12 2v4"/><path d="M12 18v4"/><path d="m4.9 4.9 2.8 2.8"/><path d="m16.3 16.3 2.8 2.8"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="m4.9 19.1 2.8-2.8"/><path d="m16.3 7.7 2.8-2.8"/><circle cx="12" cy="12" r="2"/>',
+  retro: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15v-3"/><path d="M9 15V9"/><path d="M12 15v-5"/><path d="M15 15v-2"/><path d="M18 15V8"/>',
+  palette: '<circle cx="13.5" cy="6.5" r="1"/><circle cx="17.5" cy="10.5" r="1"/><circle cx="8.5" cy="7.5" r="1"/><circle cx="6.5" cy="12.5" r="1"/><path d="M12 2a10 10 0 0 0 0 20c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a6 6 0 0 0 6-6c0-4.9-4.5-8.6-10-8.6z"/>',
+  car: '<path d="M5 17h14"/><path d="M3 17v-4l2.2-5.2A2 2 0 0 1 7 6.6h10a2 2 0 0 1 1.8 1.2L21 13v4"/><path d="M3 13h18"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
   play: '<path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.6-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" fill="currentColor" stroke="none"/>',
   pause: '<rect x="6" y="4" width="4" height="16" rx="1.2" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1.2" fill="currentColor" stroke="none"/>',
   next: '<path d="M5 5.2v13.6a.8.8 0 0 0 1.24.66l9.6-6.8a.8.8 0 0 0 0-1.32l-9.6-6.8A.8.8 0 0 0 5 5.2z" fill="currentColor" stroke="none"/><path d="M19 5v14"/>',

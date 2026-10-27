@@ -120,6 +120,51 @@ function artistCard(key) {
 }
 
 /* ---- l'objet UI ---- */
+const VIZ_MODES = [["halo", "Halo", "halo"], ["spectre", "Spectre", "bars"], ["onde", "Onde", "wave"], ["paysage", "Paysage", "mountain"], ["eclats", "Éclats", "burst"], ["retro", "Rétro", "retro"]];
+/* petit cœur qui s'envole (double toucher) */
+function heartBurst(x, y) {
+  const d = document.createElement("div"); d.className = "heart-burst"; d.style.left = x + "px"; d.style.top = y + "px"; setHTML(d, icon("heart")); document.body.append(d);
+  d.animate([{ transform: "translate(-50%,-50%) scale(.3)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1.25)", opacity: 1, offset: .35 }, { transform: "translate(-50%,-120%) scale(1)", opacity: 0 }], { duration: 850, easing: "cubic-bezier(.2,.8,.2,1)" }).onfinish = () => d.remove();
+}
+/* ===================== thèmes ===================== */
+const ACCENTS = {
+  pochette: { name: "Pochette", c1: "", c2: "", c3: "" },
+  aurore: { name: "Aurore", c1: "#a08cff", c2: "#3fe0c5", c3: "#ff7ab6" },
+  ocean: { name: "Océan", c1: "#4fa8ff", c2: "#35e0d0", c3: "#8a7dff" },
+  couchant: { name: "Couchant", c1: "#ff8a5b", c2: "#ffc94d", c3: "#ff5c8a" },
+  foret: { name: "Forêt", c1: "#59d68c", c2: "#c6e86a", c3: "#2fb8a6" },
+  rose: { name: "Bonbon", c1: "#ff79b4", c2: "#c08cff", c3: "#ffb36b" },
+  glace: { name: "Givre", c1: "#9cc8ff", c2: "#d7ecff", c3: "#b9a6ff" },
+};
+const BACKGROUNDS = [["aurore", "Aurore", "Sombre, avec l'aurore animée"], ["noir", "Noir pur", "Écrans OLED, économise la batterie"], ["clair", "Clair", "Pour le plein jour"]];
+const Theme = {
+  bg: store.get("theme", "aurore"), accent: store.get("accent", "pochette"),
+  apply() {
+    const d = document.documentElement;
+    d.classList.toggle("th-noir", this.bg === "noir"); d.classList.toggle("th-clair", this.bg === "clair");
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = this.bg === "clair" ? "#f4f2fa" : this.bg === "noir" ? "#000000" : "#07070d";
+    if (typeof UI !== "undefined" && UI.applyPalette) UI.applyPalette(UI._pal);
+  },
+  set(bg, accent) { if (bg) { this.bg = bg; store.set("theme", bg); } if (accent) { this.accent = accent; store.set("accent", accent); } this.apply(); },
+  /* couleurs : celles de la pochette, ou une palette fixe ; en thème clair, assombries pour rester lisibles */
+  palette(p) {
+    const a = ACCENTS[this.accent];
+    let out = a && a.c1 ? { c1: a.c1, c2: a.c2, c3: a.c3 } : { ...(p || DEFAULT_PAL) };
+    const rgb = (c) => Viz.parseColor(c);
+    if (this.bg === "clair") for (const k of ["c1", "c2", "c3"]) out[k] = shade(rgb(out[k]), .42);
+    const [r, g, b] = rgb(out.c1); const lum = (.2126 * r + .7152 * g + .0722 * b) / 255;
+    out.on = lum > .5 ? "#0b0a14" : "#ffffff";
+    return out;
+  },
+};
+/* couleur → même teinte avec une luminosité maximale l (0–1) */
+function shade([r, g, b], lmax) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2;
+  if (mx !== mn) { const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h /= 6; }
+  return `hsl(${Math.round(h * 360)} ${Math.round(Math.max(s, .45) * 100)}% ${Math.round(Math.min(l, lmax) * 100)}%)`;
+}
+
 const UI = {
   view: { name: "home", param: null }, stack: [], mounts: [], sel: null,
   trackSort: store.get("trackSort", { key: "default", dir: 1 }),
@@ -300,7 +345,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     this.mediaSession(t);
   },
   applyPalette(p) {
-    p = p || DEFAULT_PAL; const r = document.documentElement.style;
+    this._pal = p; p = Theme.palette(p); const r = document.documentElement.style;
     r.setProperty("--c1", p.c1); r.setProperty("--c2", p.c2); r.setProperty("--c3", p.c3); r.setProperty("--on-c1", p.on);
     Viz.setPalette(p);
   },
@@ -400,12 +445,13 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
   renderImm() {
     const el = $("#imm"); const t = Q.current && L.tracks.get(Q.current);
     const old = el.querySelector("canvas"); if (old) Viz.remove(old);
-    const modes = [["halo", "Halo", "halo"], ["spectre", "Spectre", "bars"], ["onde", "Onde", "wave"]];
+    const modes = VIZ_MODES;
     const big = t ? artBig(t.artKey) : "";
     setHTML(el, html`<div class="imm-bg" style="${big ? `background-image:url('${big}')` : ""}"></div><canvas aria-hidden="true"></canvas>
 <div class="imm-top"><button class="icon-btn" data-act="close-imm" aria-label="Fermer le mode immersif" title="Fermer (Échap)">${icon("down")}</button>
 <div class="ctx"><small>Lecture depuis</small><span>${Q.label || "ta bibliothèque"}</span></div>
-<div class="seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${Viz.mode === k}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
+<div class="seg viz-seg" role="group" aria-label="Visualiseur">${modes.map(([k, l, ic]) => html`<button data-act="viz-mode" data-mode="${k}" aria-pressed="${Viz.mode === k}" title="${l}">${icon(ic, "sm")}<span class="lbl">${l}</span></button>`)}</div>
+<button class="viz-pick" data-act="viz-menu" aria-label="Changer de visualiseur">${icon((modes.find((m) => m[0] === Viz.mode) || modes[0])[2], "sm")}<span>${(modes.find((m) => m[0] === Viz.mode) || modes[0])[1]}</span></button>
 <button class="icon-btn${this.immQueue ? " on" : ""}" data-act="imm-queue" aria-label="File d'attente" aria-pressed="${this.immQueue}">${icon("queue", "sm")}</button></div>
 <div></div>
 <div class="imm-bottom">
@@ -453,6 +499,49 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
       s = null;
     };
     el.addEventListener("pointerup", end); el.addEventListener("pointercancel", () => { s = null; el.style.transition = ""; el.style.transform = ""; });
+    /* toucher deux fois l'image : j'aime */
+    let lastTap = 0;
+    el.addEventListener("pointerup", (e) => {
+      if (e.pointerType !== "touch" || e.target.closest(".imm-bottom, .imm-top, .imm-queue")) return;
+      const now = performance.now();
+      if (now - lastTap < 380 && Q.current) { lastTap = 0; if (!L.likes.has(Q.current)) toggleLike(Q.current); heartBurst(e.clientX, e.clientY); }
+      else lastTap = now;
+    });
+    this.bindDockGestures(); this.bindRowSwipe();
+  },
+  /* lecteur du bas (téléphone) : glisser à gauche/droite pour changer de titre, vers le haut pour l'ouvrir */
+  bindDockGestures() {
+    const el = $("#dock"); let s = null;
+    el.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch" || !isPhone() || e.target.closest(".d-ctrls button, .js-like")) { s = null; return; } s = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    el.addEventListener("pointermove", (e) => { if (!s) return; const dx = e.clientX - s.x; if (Math.abs(dx) > 12) { const l = el.querySelector(".d-left"); if (l) { l.style.transition = "none"; l.style.transform = `translateX(${dx * .5}px)`; l.style.opacity = String(1 - Math.min(.6, Math.abs(dx) / 300)); } } });
+    const end = (e) => {
+      if (!s) return; const dx = e.clientX - s.x, dy = e.clientY - s.y; const l = el.querySelector(".d-left");
+      if (l) { l.style.transition = ""; l.style.transform = ""; l.style.opacity = ""; }
+      if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5 && Q.current) { this._swiped = performance.now(); dx < 0 ? Q.next() : Q.prev(); }
+      else if (dy < -50 && Math.abs(dy) > Math.abs(dx) && Q.current) { this._swiped = performance.now(); this.openImm(); }
+      s = null;
+    };
+    el.addEventListener("pointerup", end); el.addEventListener("pointercancel", () => { s = null; const l = el.querySelector(".d-left"); if (l) { l.style.transform = ""; l.style.opacity = ""; } });
+    el.addEventListener("click", (e) => { if (this._swiped && performance.now() - this._swiped < 400) { e.stopPropagation(); e.preventDefault(); } }, true);
+  },
+  /* liste de titres : glisser un titre vers la droite pour le mettre « à suivre » */
+  bindRowSwipe() {
+    const view = $("#view"); let s = null;
+    view.addEventListener("pointerdown", (e) => { const row = e.target.closest(".row"); if (e.pointerType !== "touch" || !row || e.target.closest("button")) { s = null; return; } s = { row, x: e.clientX, y: e.clientY, dir: null }; });
+    view.addEventListener("pointermove", (e) => {
+      if (!s) return; const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (!s.dir && Math.hypot(dx, dy) > 10) s.dir = Math.abs(dx) > Math.abs(dy) * 1.4 && dx > 0 ? "x" : "y";
+      if (s.dir === "x") { s.row.classList.add("swiping"); s.row.style.translate = `${Math.min(dx, 140) * .8}px 0`; s.row.classList.toggle("swipe-ok", dx > 90); }
+    });
+    const end = (e) => {
+      if (!s) return; const { row, dir } = s, dx = e.clientX - s.x; s = null;
+      row.style.translate = ""; row.classList.remove("swiping", "swipe-ok");
+      if (dir !== "x") return;
+      this._swiped = performance.now();
+      if (dx > 90) { const c = rowCtx(row); if (c) { Q.addNext([c.id]); const t = L.tracks.get(c.id); toast(`« ${t ? t.title : "Titre"} » joue juste après.`); row.animate([{ background: "color-mix(in srgb, var(--c2) 30%, transparent)" }, { background: "transparent" }], { duration: 600 }); } }
+    };
+    view.addEventListener("pointerup", end); view.addEventListener("pointercancel", () => { if (s) { s.row.style.translate = ""; s.row.classList.remove("swiping", "swipe-ok"); } s = null; });
+    view.addEventListener("click", (e) => { if (this._swiped && performance.now() - this._swiped < 400 && e.target.closest(".row")) { e.stopPropagation(); e.preventDefault(); } }, true);
   },
   renderImmQueue() { const q = $("#imm .imm-queue"); if (q) { q.hidden = !this.immQueue; if (this.immQueue) setHTML(q, this.queueHTML(Q.upcoming(40))); } },
 
