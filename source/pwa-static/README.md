@@ -30,4 +30,4 @@ Tout reste sur ton appareil : rien n'est envoyé sur internet, à part les noms 
 - `apps/android/` : l'app Android (Capacitor), avec la lecture en arrière-plan et la notification de lecture.
 - `.github/workflows/apps.yml` : à chaque envoi sur `main`, GitHub compile l'installateur Windows et l'APK, puis les publie dans Releases.
 
-L'APK est signé avec la clé rangée dans les secrets du dépôt (`AURORE_KEYSTORE_B64`, `AURORE_KEYSTORE_PASSWORD`), toujours la même : chaque nouvelle version s'installe par-dessus l'ancienne. Sans ces secrets, la compilation utilise une clé temporaire et le signale.
+L'APK est signé avec la clé rangée dans le secret du dépôt `AURORE_ANDROID_KEY` (mot de passe, deux-points, puis le fichier .p12 en base64), toujours la même : chaque nouvelle version s'installe par-dessus l'ancienne. Sans ce secret, la compilation utilise une clé temporaire et ne publie pas l'APK.

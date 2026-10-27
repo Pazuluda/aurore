@@ -79,16 +79,17 @@ jobs:
       - name: Signer l'APK
         working-directory: apps/android/android
         env:
-          KS_B64: ${{ secrets.AURORE_KEYSTORE_B64 }}
-          KS_PASS: ${{ secrets.AURORE_KEYSTORE_PASSWORD }}
+          AURORE_ANDROID_KEY: ${{ secrets.AURORE_ANDROID_KEY }}
         run: |
-          if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
-            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/aurore.p12"
+          KEY=$(printf '%s' "$AURORE_ANDROID_KEY" | tr -d ' \r\n')
+          if [ -n "$KEY" ] && [ "${KEY#*:}" != "$KEY" ]; then
+            export KS_PASS="${KEY%%:*}"
+            printf '%s' "${KEY#*:}" | base64 -d > "$RUNNER_TEMP/aurore.p12"
           else
-            echo "::warning::Secrets AURORE_KEYSTORE_B64 / AURORE_KEYSTORE_PASSWORD absents : APK signé avec une clé temporaire. Pour l'installer, désinstalle d'abord une version signée autrement."
+            echo "::warning::Secret AURORE_ANDROID_KEY absent : APK signé avec une clé temporaire et non publié."
             export KS_PASS=$(openssl rand -hex 16)
             touch ../SIGNATURE_TEMPORAIRE
-            keytool -genkeypair -keystore "$RUNNER_TEMP/aurore.p12" -storetype PKCS12 -alias aurore -keyalg RSA -keysize 3072 -validity 10950 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=aurore temporaire"
+            keytool -genkeypair -keystore "$RUNNER_TEMP/aurore.p12" -storetype PKCS12 -alias aurore -keyalg EC -groupname secp256r1 -validity 10950 -storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=aurore temporaire"
           fi
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           "$BT/zipalign" -p -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
@@ -115,7 +116,7 @@ jobs:
       - name: APK signé avec la clé du dépôt seulement
         run: |
           if [ -f out/SIGNATURE_TEMPORAIRE ]; then
-            echo "::warning::APK non publié : ajoute les secrets AURORE_KEYSTORE_B64 et AURORE_KEYSTORE_PASSWORD, puis relance."
+            echo "::warning::APK non publié : ajoute le secret AURORE_ANDROID_KEY, puis relance."
             rm -f out/aurore-android.apk
           fi
       - uses: softprops/action-gh-release@v2
