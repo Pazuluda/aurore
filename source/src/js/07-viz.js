@@ -8,10 +8,13 @@ const Viz = {
   cover: null, coverAngle: 0, coverSpin: true, particles: [],
   idleShape: Array.from({ length: 96 }, (_, i) => { const x = i / 95; return clamp(.55 * Math.exp(-((x - .12) ** 2) / .02) + .38 * Math.exp(-((x - .42) ** 2) / .03) + .22 * Math.exp(-((x - .72) ** 2) / .02) + .06, 0, 1); }),
 
-  attach(analyser, sr) {
+  attach(analyser, sr) { this.webAn = analyser; this.webSr = sr; if (!this.nativeOn) this.use(analyser, sr); },
+  use(analyser, sr) {
     this.analyser = analyser; this.sr = sr;
-    this.freq = new Uint8Array(analyser.frequencyBinCount); this.wave = new Uint8Array(analyser.fftSize);
+    if (analyser) { this.freq = new Uint8Array(analyser.frequencyBinCount); this.wave = new Uint8Array(analyser.waveLength || analyser.fftSize); }
   },
+  /* Android : le spectre vient du lecteur natif (NV) au lieu de Web Audio */
+  setNative(on) { this.nativeOn = on; if (on) this.use(NV, NV.sr); else this.use(this.webAn || null, this.webSr || 48000); },
   add(canvas, kind) {
     const t = { canvas, kind, g: canvas.getContext("2d"), w: 0, h: 0, dpr: 1, idleDrawn: false };
     const resize = () => {
@@ -53,13 +56,18 @@ const Viz = {
     const playing = Player.playing && this.analyser;
     const N = this.N;
     if (playing) {
-      this.analyser.getByteFrequencyData(this.freq);
-      this.analyser.getByteTimeDomainData(this.wave);
+      const nat = this.analyser.native, fresh = nat && performance.now() - this.analyser.at < 500;
+      if (nat) { for (let k = 0; k < this.wave.length; k++) this.wave[k] = fresh ? this.analyser.wave[k] : 128; }
+      else { this.analyser.getByteFrequencyData(this.freq); this.analyser.getByteTimeDomainData(this.wave); }
       const binHz = this.sr / this.analyser.fftSize;
       for (let i = 0; i < N; i++) {
-        const f0 = 32 * Math.pow(16000 / 32, i / N), f1 = 32 * Math.pow(16000 / 32, (i + 1) / N);
-        const b0 = Math.floor(f0 / binHz), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
-        let m = 0; for (let b = b0; b < b1 && b < this.freq.length; b++) if (this.freq[b] > m) m = this.freq[b];
+        let m = 0;
+        if (nat) m = fresh ? this.analyser.bands[i] : 0;
+        else {
+          const f0 = 32 * Math.pow(16000 / 32, i / N), f1 = 32 * Math.pow(16000 / 32, (i + 1) / N);
+          const b0 = Math.floor(f0 / binHz), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
+          for (let b = b0; b < b1 && b < this.freq.length; b++) if (this.freq[b] > m) m = this.freq[b];
+        }
         let v = (m / 255) * (.86 + .3 * (i / N));
         v = Math.pow(clamp((v - .18) / .78, 0, 1), 1.25);
         const cur = this.bands[i];

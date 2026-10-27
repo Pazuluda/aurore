@@ -13,6 +13,17 @@ add = "".join(f'    <uses-permission android:name="{p}" />\n' for p in perms if 
 if "android.permission.READ_EXTERNAL_STORAGE" not in s:
     add += '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n'
 s = s.replace("</manifest>", add + "</manifest>")
+# lecteur natif : service de lecture (continue quand l'app est fermée ou l'écran éteint)
+if "AuroreService" not in s:
+    s = s.replace("</application>", """        <service
+            android:name=".AuroreService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+    </application>""", 1)
 man.write_text(s)
 
 # module maison : musique du téléphone (MediaStore) + serveur de fichiers avec plages d'octets
@@ -23,6 +34,10 @@ for f in (here / "native").glob("*.java"):
 
 g = app / "build.gradle"; s = g.read_text()
 s = re.sub(r"versionCode \d+", f"versionCode {int(code)}", s)
+MEDIA3 = "1.4.1"  # dernière version compatible avec compileSdk 34 (Capacitor 6)
+if "androidx.media3" not in s:
+    deps = "".join(f'\n    implementation "androidx.media3:media3-{m}:{MEDIA3}"' for m in ("exoplayer", "session"))
+    s = re.sub(r"dependencies\s*\{", lambda m: m.group(0) + deps, s, count=1)
 s = re.sub(r'versionName "[^"]*"', f'versionName "{version}"', s)
 g.write_text(s)
 

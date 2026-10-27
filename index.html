@@ -1526,8 +1526,181 @@ const AndroidMusic = CAP ? {
     } finally {
       this.busy = false;
       UI.renderNav(); if (UI.view.name === "home") UI.rerender();
+      if (NP && Player.mode === "native") NP.refreshSoon();
       if (this.again) { this.again = false; setTimeout(() => this.scan({ quiet: true }), 500); }
     }
+  },
+} : null;
+
+/* Android : la lecture se fait dans un service natif (lecteur ExoPlayer), comme les autres lecteurs.
+   Elle continue app fermée, écran éteint ou verrouillé. L'app lui envoie les titres à venir (fenêtre),
+   suit ce qu'il joue, et reçoit de quoi animer les visualiseurs quand elle est à l'écran. */
+const NV = { native: true, fftSize: 4096, frequencyBinCount: 2048, waveLength: 512, sr: 44100, bands: new Uint8Array(96), wave: new Uint8Array(512).fill(128), at: 0 };
+const blobB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => res(""); r.readAsDataURL(blob); });
+const NP = CAP ? {
+  ok: false, st: null, gen: 0, win: [], cur: 0, loaded: false, pending: null, lastState: 0, vizOn: false, vol: -1, art: new Set(), artQ: Promise.resolve(),
+  call(m, o) { return CAP.nativePromise("AuroreMusic", m, o || {}); },
+  newGen() { let g = Date.now() % 2000000000; if (g === this.gen) g++; return g; },
+  /* au démarrage : branche les évènements ; si le service jouait déjà (app rouverte), on reprend où il en est */
+  async boot() {
+    let s;
+    try { s = await this.call("pstate", { start: false }); } catch { return; }
+    if (!s || typeof s.count !== "number") return;
+    this.ok = true;
+    try {
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (d && d.gen === this.gen) this.apply(d, true); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
+    } catch { /* ancienne version */ }
+    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); });
+    if (s.count > 0 && s.id && L.tracks.has(s.id)) this.adopt(s);
+  },
+  adopt(s) {
+    const saved = store.get("nwin", null), same = saved && saved.gen === s.gen && Array.isArray(saved.items);
+    this.gen = s.gen; this.loaded = true; this.pending = null; this.lastState = s.state;
+    this.win = same ? saved.items : (s.ids || []).map((id) => ({ id, src: "?" }));
+    this.cur = same ? (saved.cur || 0) : s.index;
+    Player.enterNative(); Player.id = null; Player.playing = false;
+    this.apply(s);
+  },
+  item(id) {
+    const t = L.tracks.get(id), f = L.files.get(id);
+    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "" };
+  },
+  playable(id) { return !!(L.files.get(id)?.media && L.tracks.has(id)); },
+  /* titres envoyés au service : 5 précédents, celui qui joue, puis jusqu'à 150 à venir (file d'attente, puis la suite) */
+  window(id) {
+    if (Q.current !== id) return { items: [{ id, src: "c" }], index: 0 };
+    const items = [], ok = (x) => this.playable(x);
+    for (let i = Q.fromManual ? Q.pos : Q.pos - 1; i >= 0 && items.length < 5; i--) { const x = Q.ctx[Q.order[i]]; if (!ok(x)) break; items.unshift({ id: x, src: "o", p: i }); }
+    const index = items.length;
+    items.push({ id, src: Q.fromManual ? "cm" : "c", p: Q.pos });
+    let n = 0;
+    for (const x of Q.manual) { if (!ok(x) || n >= 150) return { items, index }; items.push({ id: x, src: "m" }); n++; }
+    const len = Q.order.length;
+    for (let k = 1; len && n < 150; k++) {
+      let i = Q.pos + k;
+      if (i >= len) { if (Q.repeat !== "all") break; i %= len; }
+      const x = Q.ctx[Q.order[i]]; if (!ok(x)) break;
+      items.push({ id: x, src: "o", p: i }); n++;
+    }
+    return { items, index };
+  },
+  repeatMode() { return Q.repeat === "one" ? 1 : 0; },
+  saveWin() { store.set("nwin", { gen: this.gen, cur: this.cur, items: this.win }); },
+  /* titre choisi mais pas encore lancé (démarrage de l'app) : le service n'est sollicité qu'à la lecture */
+  cue(t) {
+    this.gen = this.newGen(); this.loaded = false; this.pending = { t: t || 0 };
+    if (this.st && this.st.playing) this.call("ppause").catch(() => {});
+  },
+  async load(id, play, startAt) {
+    const gen = (this.gen = this.newGen());
+    this.pending = { t: startAt || 0 };
+    const w = this.window(id);
+    await this.ensureArt([id], 1200);
+    if (gen !== this.gen) return true;
+    let s;
+    try { s = await this.call("pload", { gen, items: w.items.map((m) => this.item(m.id)), index: w.index, pos: Math.round((startAt || 0) * 1000), play, repeat: this.repeatMode() }); }
+    catch { return gen !== this.gen; }
+    if (gen !== this.gen) return true;
+    this.loaded = true; this.pending = null; this.win = w.items; this.cur = w.index; this.lastState = s.state; this.saveWin();
+    this.apply(s); this.artAhead();
+    return true;
+  },
+  /* suit le service : changement de titre (enchaînement, notification, casque), lecture/pause, fin, erreur */
+  apply(s, ev = false) {
+    this.st = s;
+    if (Player.mode !== "native") return;
+    if (s.id && s.id !== Player.id && L.tracks.has(s.id)) {
+      Q.adoptNative(s.id, s.index, s.reason);
+      Player.id = s.id; Player.emit("track", s.id); Player.emit("meta");
+      this.saveWin(); this.artAhead(); this.refreshSoon();
+    } else if (s.id && this.win[s.index] && this.win[s.index].id === s.id) this.cur = s.index;
+    if (s.reason === 0 && Q.session) { Q.creditEnd(); Q.session.counted = false; Q.session.listened = 0; Q.session.last = null; }
+    const playing = !!s.want && (s.state === 2 || s.state === 3);
+    if (playing !== Player.playing) { Player.playing = playing; Player.emit("state"); }
+    /* fin et erreur : seulement sur les évènements du service (les réponses peuvent arriver après) */
+    const ended = ev && s.state === 4 && this.lastState !== 4 && s.count > 0;
+    if (ev || s.state !== 4) this.lastState = s.state;
+    if (ev && s.error) Player.emit("error", Player.id);
+    else if (ended) { Q.creditEnd(); Q.flushSession(); Q.next(true); }
+    this.vizSync();
+  },
+  pos() {
+    const s = this.st;
+    if (!this.loaded || this.pending || !s || s.id !== Player.id) return this.pending ? this.pending.t : 0;
+    let ms = s.pos + (s.playing ? Math.max(0, Date.now() - s.at) : 0);
+    if (s.dur > 0) ms = Math.min(ms, s.dur);
+    return ms / 1000;
+  },
+  async play() {
+    if (!this.loaded) return this.load(Player.id, true, this.pending ? this.pending.t : 0);
+    let s; try { s = await this.call("pplay"); } catch { return; }
+    if (!s.id || s.id !== Player.id || s.gen !== this.gen) return this.load(Player.id, true, this.pos()); /* le service s'était arrêté */
+    this.apply(s);
+  },
+  async pause() {
+    if (!this.loaded) return;
+    try { const s = await this.call("ppause"); if (s.gen === this.gen) this.apply(s); } catch { /* rien */ }
+  },
+  async seek(t) {
+    if (!this.loaded || this.pending) { this.pending = { t }; return; }
+    if (this.st) { this.st = { ...this.st, pos: t * 1000, at: Date.now() }; }
+    try { const s = await this.call("pseek", { pos: Math.round(t * 1000) }); if (s.gen === this.gen) this.apply(s); } catch { /* rien */ }
+  },
+  volume(v) { if (!this.ok || v === this.vol) return; this.vol = v; this.call("pvolume", { volume: v }).catch(() => {}); },
+  stop() { this.gen = this.newGen(); this.loaded = false; this.pending = null; this.vizSync(); this.call("pstop").catch(() => {}); },
+  refreshSoon: debounce(() => NP.refresh(), 400),
+  /* la file a changé (ajout, aléatoire, répétition…) ou le service avance : on met à jour les titres à venir */
+  async refresh() {
+    if (Player.mode !== "native" || !this.loaded || this.pending || !Player.id || !this.playable(Player.id)) return;
+    const w = this.window(Player.id), repeat = this.repeatMode();
+    const same = w.index === this.cur && w.items.length === this.win.length && w.items.every((m, i) => m.id === this.win[i].id) && this.st && repeat === this.st.repeat;
+    if (same) { this.win = w.items; this.saveWin(); return; }
+    const gen = this.gen;
+    try {
+      const s = await this.call("pupdate", { currentId: Player.id, items: w.items.map((m) => this.item(m.id)), index: w.index, repeat });
+      if (gen !== this.gen) return;
+      this.win = w.items; this.cur = s.index; this.saveWin(); this.apply(s); this.artAhead();
+    } catch { /* le titre a changé entre-temps : la mise à jour suivante s'en charge */ }
+  },
+  /* l'app revient à l'écran : on recale la position et l'état */
+  async sync() {
+    if (Player.mode !== "native" || !this.loaded || this.pending) return;
+    let s; try { s = await this.call("pstate", { start: false }); } catch { return; }
+    if (s.gen === this.gen && s.count > 0) return this.apply(s);
+    const t = this.pos(); this.loaded = false; this.pending = { t };
+    if (Player.playing) { Player.playing = false; Player.emit("state"); }
+  },
+  /* pochettes pour la notification et l'écran verrouillé */
+  ensureArt(ids, timeout) {
+    const keys = [...new Set(ids.map((id) => L.tracks.get(id)?.artKey).filter((k) => k && !this.art.has(k) && L.art.get(k)?.big))];
+    if (!keys.length) return Promise.resolve();
+    const work = (this.artQ = this.artQ.then(async () => {
+      let missing = keys;
+      try { missing = (await this.call("partHas", { keys })).missing || []; } catch { return; }
+      for (const k of keys) if (!missing.includes(k)) this.art.add(k);
+      for (const k of missing) {
+        if (this.art.has(k)) continue;
+        const data = await blobB64(L.art.get(k).big);
+        if (data) try { await this.call("part", { key: k, data }); this.art.add(k); } catch { /* tant pis */ }
+      }
+    }).catch(() => {}));
+    return Promise.race([work, sleep(timeout)]);
+  },
+  artAhead() { this.ensureArt(this.win.slice(this.cur, this.cur + 12).map((m) => m.id), 60000); },
+  /* visualiseurs : seulement quand l'app est à l'écran et que la musique joue */
+  vizSync() {
+    const want = Player.mode === "native" && Player.playing && !document.hidden;
+    if (want === this.vizOn) return;
+    this.vizOn = want; this.call("pviz", { on: want }).catch(() => {});
+  },
+  onViz(d) {
+    if (!d.b) return;
+    const b = atob(d.b), w = atob(d.w || "");
+    for (let i = 0; i < 96 && i < b.length; i++) NV.bands[i] = b.charCodeAt(i);
+    for (let i = 0; i < 512 && i < w.length; i++) NV.wave[i] = w.charCodeAt(i);
+    if (d.sr) NV.sr = d.sr;
+    NV.at = performance.now();
   },
 } : null;
 
@@ -2104,19 +2277,24 @@ const Player = {
     return this.ctx;
   },
   applyVolume() {
+    if (this.mode === "native") return this.applyNativeVolume();
     const v = this.muted ? 0 : this.volume * this.volume;
     if (this.split) { this.audio.volume = clamp(v, 0, 1); if (this.vol && this.ctx) this.vol.gain.value = v; return; }
     if (this.vol && this.ctx) this.vol.gain.setTargetAtTime(v, this.ctx.currentTime, .015);
     else if (this.audio) this.audio.volume = clamp(v, 0, 1);
   },
+  /* Android : le son passe par le service natif ; ici, seulement muet ou plein volume (les boutons du téléphone font le reste) */
+  applyNativeVolume() { if (NP) NP.volume(this.muted ? 0 : 1); },
   setVolume(v) { this.volume = clamp(v, 0, 1); if (this.volume > 0) this.muted = false; store.set("volume", this.volume); this.applyVolume(); this.emit("volume"); },
   toggleMute() { this.muted = !this.muted; this.applyVolume(); this.emit("volume"); },
 
   get currentTime() {
+    if (this.mode === "native") return NP.pos();
     if (this.mode === "buffer") return this.playing && this.ctx ? this.ctx.currentTime - this.bStart : this.bOffset;
     return this.audio.currentTime || 0;
   },
   get duration() {
+    if (this.mode === "native") { const st = NP.st; return (st && st.id === this.id && st.dur > 0 ? st.dur / 1000 : 0) || L.tracks.get(this.id)?.duration || 0; }
     if (this.mode === "buffer") return this.buf ? this.buf.duration : 0;
     const d = this.audio.duration; return isFinite(d) ? d : (L.tracks.get(this.id)?.duration || 0);
   },
@@ -2124,6 +2302,11 @@ const Player = {
   async load(id, { autoplay = true, startAt = 0 } = {}) {
     const f = L.files.get(id); if (!f) return false;
     const token = ++this.token;
+    if (NP && NP.ok && f.media) {
+      if (await this.loadNative(id, token, autoplay, startAt)) return true;
+      if (token !== this.token) return false;
+    }
+    if (this.mode === "native") this.leaveNative();
     let src;
     if (f.url) src = f.url; /* fichier du téléphone : lu en continu, sans copie en mémoire */
     else {
@@ -2150,6 +2333,31 @@ const Player = {
     else { this.playing = false; this.emit("state"); }
     return true;
   },
+  /* Android : titre du téléphone joué par le service natif */
+  async loadNative(id, token, autoplay, startAt) {
+    this.stopBuffer(); this.buf = null;
+    this.enterNative();
+    this.id = id; this.loading = false; this.triedBuffer = false;
+    this.emit("track", id);
+    if (!autoplay) { NP.cue(startAt); this.playing = false; this.emit("state"); return true; }
+    this.playing = true; this.emit("state");
+    if (await NP.load(id, true, startAt)) return true;
+    if (token === this.token) { NP.ok = false; this.playing = false; this.mode = "element"; Viz.setNative(false); } /* service indisponible : lecture dans l'app, comme avant */
+    return false;
+  },
+  enterNative() {
+    if (this.mode === "native") return;
+    this.mode = "native";
+    this._pausing = true; this.audio.pause(); this._pausing = false;
+    this.audio.removeAttribute("src"); try { this.audio.load(); } catch { /* rien */ }
+    if (this.shadow) { this.shadow.pause(); this.shadow.removeAttribute("src"); }
+    if (this.url && this.url.startsWith("blob:")) URL.revokeObjectURL(this.url);
+    this.url = null;
+    Viz.setNative(true);
+    if (NativeMedia) NativeMedia.call("setPlaybackState", { playbackState: "none" });
+    this.applyNativeVolume();
+  },
+  leaveNative() { this.mode = "element"; NP.stop(); Viz.setNative(false); },
   async onElementError() {
     if (this.mode !== "element" || !this.id || !this.audio.getAttribute("src")) return;
     if (this.triedBuffer) return;
@@ -2189,6 +2397,7 @@ const Player = {
 
   async play() {
     if (!this.id) return;
+    if (this.mode === "native") { if (!this.playing) { this.playing = true; this.emit("state"); } return NP.play(); }
     this.wantPlay = true;
     const ctx = this.ensureCtx();
     if (this.split && this.mode === "element") {
@@ -2208,6 +2417,7 @@ const Player = {
   },
   pause() {
     this.wantPlay = false;
+    if (this.mode === "native") { if (this.playing) { this.playing = false; this.emit("state"); } NP.pause(); NP.vizSync(); return; }
     if (!this.playing) return;
     if (this.split && this.mode === "element") {
       this._pausing = true; this.audio.pause(); this._pausing = false; this.shadow.pause();
@@ -2236,16 +2446,18 @@ const Player = {
   },
   seek(t) {
     const d = this.duration; t = clamp(t, 0, d ? d - .05 : t);
-    if (this.mode === "buffer") {
+    if (this.mode === "native") NP.seek(t);
+    else if (this.mode === "buffer") {
       if (this.playing) { this.stopBuffer(); this.startBuffer(t); } else this.bOffset = t;
     } else { try { this.audio.currentTime = t; if (this.shadow && this.shadow.getAttribute("src")) this.shadow.currentTime = t; } catch { /* pas prêt */ } }
     this.emit("seek", t);
   },
   stop() {
     this.token++; this.stopBuffer(); this.buf = null;
+    if (this.mode === "native") this.leaveNative();
     this.audio.pause(); this.audio.removeAttribute("src");
     if (this.shadow) { this.shadow.pause(); this.shadow.removeAttribute("src"); }
-    if (this.url) URL.revokeObjectURL(this.url);
+    if (this.url && this.url.startsWith("blob:")) URL.revokeObjectURL(this.url);
     this.url = null; this.id = null; this.playing = false;
     this.emit("track", null); this.emit("state");
   },
@@ -2309,6 +2521,40 @@ const Q = {
   cycleRepeat() {
     this.repeat = this.repeat === "off" ? "all" : this.repeat === "all" ? "one" : "off"; store.set("repeat", this.repeat);
     UI.syncControls();
+    if (NP && Player.mode === "native") NP.refreshSoon();
+  },
+  /* Android : le service est passé à un autre titre (enchaînement, notification, casque, montre) */
+  adoptNative(id, idx, reason) {
+    if (reason === 1) this.creditEnd();
+    const w = NP.win;
+    let j = w[idx] && w[idx].id === id ? idx : -1;
+    if (j < 0) for (let k = 0; k < w.length; k++) if (w[k].id === id && (j < 0 || Math.abs(k - NP.cur) < Math.abs(j - NP.cur))) j = k;
+    if (j >= 0) {
+      for (let k = NP.cur + 1; k <= j; k++) if (w[k] && w[k].src === "m") { const i = this.manual.indexOf(w[k].id); if (i >= 0) this.manual.splice(i, 1); }
+      const m = w[j];
+      if (m.p != null && m.p < this.order.length && this.ctx[this.order[m.p]] === id) this.pos = m.p;
+      else if (m.src === "?") this.locate(id);
+      this.fromManual = m.src === "m" || m.src === "cm";
+      NP.cur = j;
+    } else this.locate(id);
+    this.flushSession();
+    this.current = id; this.session = { id, listened: 0, counted: false, last: null };
+    UI.onQueueChanged(); this.saveNow(); /* tout de suite : l'app peut être fermée à tout moment */
+  },
+  locate(id) {
+    const i = this.manual.indexOf(id);
+    if (i >= 0) { this.manual.splice(0, i + 1); this.fromManual = true; return; }
+    const n = this.order.length; this.fromManual = false;
+    for (let k = 1; k <= n; k++) { const p = (this.pos + k + n) % n; if (this.ctx[this.order[p]] === id) { this.pos = p; return; } }
+  },
+  /* titre allé jusqu'au bout pendant que l'app dormait : on compte la fin de l'écoute */
+  creditEnd() {
+    const s = this.session; if (!s || s.id !== Player.id) return;
+    const dur = L.tracks.get(s.id)?.duration || 0; if (!dur) return;
+    const rest = s.last == null ? (s.listened ? 0 : dur) : Math.max(0, dur - s.last);
+    if (rest > 0 && rest < 900) { s.listened += rest; s.pending = (s.pending || 0) + rest; }
+    if (!s.counted && s.listened >= Math.min(30, dur * .5)) { s.counted = true; if (!L.tracks.get(s.id)?.demo) countPlay(s.id); UI.onStatsChanged(); }
+    s.last = dur;
   },
   addNext(ids) { this.manual.unshift(...ids.filter((id) => L.tracks.has(id))); UI.onQueueChanged(); },
   addEnd(ids) { this.manual.push(...ids.filter((id) => L.tracks.has(id))); UI.onQueueChanged(); },
@@ -2317,20 +2563,21 @@ const Q = {
   tick() {
     Player.syncShadow(false);
     const s = this.session; if (!s || !Player.playing || Player.id !== s.id) { if (s) s.last = null; return; }
-    const t = Player.currentTime;
+    const t = Player.currentTime, now = Date.now();
     if (s.last != null) {
-      const d = t - s.last;
-      if (d > 0 && d < 2) { s.listened += d; s.pending = (s.pending || 0) + d; }
+      const d = t - s.last, real = (now - (s.wall || now)) / 1000;
+      if (d > 0 && d < Math.max(2, real + 1.5)) { s.listened += d; s.pending = (s.pending || 0) + d; }
     }
-    s.last = t;
+    s.last = t; s.wall = now;
     const dur = Player.duration || 1;
     if (!s.counted && s.listened >= Math.min(30, dur * .5)) { s.counted = true; if (!L.tracks.get(s.id)?.demo) countPlay(s.id); UI.onStatsChanged(); }
     if (s.pending > 10) this.flushSession();
   },
   flushSession() { const s = this.session; if (s && s.pending > .5) { if (!L.tracks.get(s.id)?.demo) addListened(s.id, s.pending); s.pending = 0; } },
-  save: debounce(() => {
+  saveNow() {
     store.set("q", { ctx: Q.ctx.slice(0, 3000), label: Q.label, ref: Q.ref, order: Q.order.slice(0, 3000), pos: Q.pos, manual: Q.manual.slice(0, 200), current: Q.current, t: Player.currentTime });
-  }, 800),
+  },
+  save: debounce(() => Q.saveNow(), 800),
   restore() {
     const s = store.get("q", null); if (!s || !s.current || !L.tracks.has(s.current)) return;
     this.ctx = (s.ctx || []).filter((id) => L.tracks.has(id)); this.label = s.label || ""; this.ref = s.ref || null;
@@ -2352,10 +2599,13 @@ const Viz = {
   cover: null, coverAngle: 0, coverSpin: true, particles: [],
   idleShape: Array.from({ length: 96 }, (_, i) => { const x = i / 95; return clamp(.55 * Math.exp(-((x - .12) ** 2) / .02) + .38 * Math.exp(-((x - .42) ** 2) / .03) + .22 * Math.exp(-((x - .72) ** 2) / .02) + .06, 0, 1); }),
 
-  attach(analyser, sr) {
+  attach(analyser, sr) { this.webAn = analyser; this.webSr = sr; if (!this.nativeOn) this.use(analyser, sr); },
+  use(analyser, sr) {
     this.analyser = analyser; this.sr = sr;
-    this.freq = new Uint8Array(analyser.frequencyBinCount); this.wave = new Uint8Array(analyser.fftSize);
+    if (analyser) { this.freq = new Uint8Array(analyser.frequencyBinCount); this.wave = new Uint8Array(analyser.waveLength || analyser.fftSize); }
   },
+  /* Android : le spectre vient du lecteur natif (NV) au lieu de Web Audio */
+  setNative(on) { this.nativeOn = on; if (on) this.use(NV, NV.sr); else this.use(this.webAn || null, this.webSr || 48000); },
   add(canvas, kind) {
     const t = { canvas, kind, g: canvas.getContext("2d"), w: 0, h: 0, dpr: 1, idleDrawn: false };
     const resize = () => {
@@ -2397,13 +2647,18 @@ const Viz = {
     const playing = Player.playing && this.analyser;
     const N = this.N;
     if (playing) {
-      this.analyser.getByteFrequencyData(this.freq);
-      this.analyser.getByteTimeDomainData(this.wave);
+      const nat = this.analyser.native, fresh = nat && performance.now() - this.analyser.at < 500;
+      if (nat) { for (let k = 0; k < this.wave.length; k++) this.wave[k] = fresh ? this.analyser.wave[k] : 128; }
+      else { this.analyser.getByteFrequencyData(this.freq); this.analyser.getByteTimeDomainData(this.wave); }
       const binHz = this.sr / this.analyser.fftSize;
       for (let i = 0; i < N; i++) {
-        const f0 = 32 * Math.pow(16000 / 32, i / N), f1 = 32 * Math.pow(16000 / 32, (i + 1) / N);
-        const b0 = Math.floor(f0 / binHz), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
-        let m = 0; for (let b = b0; b < b1 && b < this.freq.length; b++) if (this.freq[b] > m) m = this.freq[b];
+        let m = 0;
+        if (nat) m = fresh ? this.analyser.bands[i] : 0;
+        else {
+          const f0 = 32 * Math.pow(16000 / 32, i / N), f1 = 32 * Math.pow(16000 / 32, (i + 1) / N);
+          const b0 = Math.floor(f0 / binHz), b1 = Math.max(b0 + 1, Math.ceil(f1 / binHz));
+          for (let b = b0; b < b1 && b < this.freq.length; b++) if (this.freq[b] > m) m = this.freq[b];
+        }
         let v = (m / 255) * (.86 + .3 * (i / N));
         v = Math.pow(clamp((v - .18) / .78, 0, 1), 1.25);
         const cur = this.bands[i];
@@ -2897,7 +3152,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
   },
   onLibraryChanged() { this.renderNav(); this.onLibraryProgress(); if (["home", "tracks", "albums", "artists", "album", "artist", "list", "search", "discover"].includes(this.view.name)) this.rerender(); },
   onStatsChanged() { if (this.view.name === "home" && !this.imm) this.rerender(); },
-  onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); },
+  onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); if (NP && Player.mode === "native") NP.refreshSoon(); },
 
   /* ---- bannière fichiers manquants ---- */
   needFiles() {
@@ -2947,7 +3202,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     const liked = Q.current && L.likes.has(Q.current);
     for (const b of $$(".js-like")) { b.hidden = !Q.current; b.classList.toggle("on", !!liked); b.setAttribute("aria-pressed", !!liked); b.setAttribute("aria-label", liked ? "Retirer des titres likés" : "Ajouter aux titres likés"); }
     document.documentElement.style.setProperty("--eq", Player.playing ? "running" : "paused");
-    if (NativeMedia) NativeMedia.state();
+    if (NativeMedia && Player.mode !== "native") NativeMedia.state();
     try { if (navigator.mediaSession) navigator.mediaSession.playbackState = Player.id ? (Player.playing ? "playing" : "paused") : "none"; } catch { /* ignoré */ }
     this.keepAwake(Player.playing);
     document.documentElement.style.setProperty("--drift", Player.playing && !Viz.calm ? "running" : "paused");
@@ -2966,7 +3221,8 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     if (!this.seeking) for (const s of $$(".js-seek")) { s.value = Math.round(p * 1000); s.style.setProperty("--p", p * 100 + "%"); }
     for (const m of $$(".js-mini")) m.style.width = p * 100 + "%";
     const now = performance.now();
-    if (NativeMedia && Player.id && d) NativeMedia.position(d, t);
+    if (Player.mode === "native") { /* notification gérée par le service natif */ }
+    else if (NativeMedia && Player.id && d) NativeMedia.position(d, t);
     else if (Player.id && d && navigator.mediaSession?.setPositionState && (!this._posAt || now - this._posAt > 1000)) {
       this._posAt = now;
       try { navigator.mediaSession.setPositionState({ duration: d, playbackRate: 1, position: clamp(t, 0, d) }); } catch { /* ignoré */ }
@@ -3149,7 +3405,7 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
   renderImmQueue() { const q = $("#imm .imm-queue"); if (q) { q.hidden = !this.immQueue; if (this.immQueue) setHTML(q, this.queueHTML(Q.upcoming(40))); } },
 
   mediaSession(t) {
-    if (NativeMedia) { NativeMedia.track(t); return; }
+    if (NativeMedia) { if (Player.mode !== "native") NativeMedia.track(t); return; }
     const ms = navigator.mediaSession; if (!ms) return;
     try {
       ms.metadata = t ? new MediaMetadata({ title: t.title, artist: t.artist, album: t.album || "", artwork: artBig(t.artKey) ? [{ src: artBig(t.artKey), sizes: "640x640", type: "image/webp" }] : [] }) : null;
@@ -3846,7 +4102,7 @@ function bindEvents() {
   });
   setInterval(() => Q.tick(), 250);
   setInterval(() => { if (Player.playing) Q.save(); }, 5000);
-  window.addEventListener("pagehide", () => { Q.flushSession(); Q.save(); });
+  window.addEventListener("pagehide", () => { Q.flushSession(); Q.saveNow(); });
   matchMedia("(max-width: 1240px)").addEventListener("change", () => { $("#app").classList.remove("np-open"); $("#app").classList.toggle("np-off", !matchMedia("(max-width: 1240px)").matches && !UI.npOpen); });
 }
 
@@ -3867,6 +4123,7 @@ async function boot() {
   UI.render(); UI.onLibraryProgress();
   setTimeout(() => { document.documentElement.classList.add("booted"); setTimeout(() => $("#boot")?.remove(), 600); }, Math.max(0, 900 - performance.now()));
   Q.restore();
+  if (NP) await NP.boot(); /* Android : la musique jouait peut-être encore, app fermée */
   UI.bindImmGestures();
   Install.init();
   window.addEventListener("popstate", () => UI.onPop());
@@ -3906,7 +4163,7 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV };
 boot();
 
 })();

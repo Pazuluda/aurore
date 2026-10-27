@@ -139,8 +139,181 @@ const AndroidMusic = CAP ? {
     } finally {
       this.busy = false;
       UI.renderNav(); if (UI.view.name === "home") UI.rerender();
+      if (NP && Player.mode === "native") NP.refreshSoon();
       if (this.again) { this.again = false; setTimeout(() => this.scan({ quiet: true }), 500); }
     }
+  },
+} : null;
+
+/* Android : la lecture se fait dans un service natif (lecteur ExoPlayer), comme les autres lecteurs.
+   Elle continue app fermée, écran éteint ou verrouillé. L'app lui envoie les titres à venir (fenêtre),
+   suit ce qu'il joue, et reçoit de quoi animer les visualiseurs quand elle est à l'écran. */
+const NV = { native: true, fftSize: 4096, frequencyBinCount: 2048, waveLength: 512, sr: 44100, bands: new Uint8Array(96), wave: new Uint8Array(512).fill(128), at: 0 };
+const blobB64 = (blob) => new Promise((res) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1] || ""); r.onerror = () => res(""); r.readAsDataURL(blob); });
+const NP = CAP ? {
+  ok: false, st: null, gen: 0, win: [], cur: 0, loaded: false, pending: null, lastState: 0, vizOn: false, vol: -1, art: new Set(), artQ: Promise.resolve(),
+  call(m, o) { return CAP.nativePromise("AuroreMusic", m, o || {}); },
+  newGen() { let g = Date.now() % 2000000000; if (g === this.gen) g++; return g; },
+  /* au démarrage : branche les évènements ; si le service jouait déjà (app rouverte), on reprend où il en est */
+  async boot() {
+    let s;
+    try { s = await this.call("pstate", { start: false }); } catch { return; }
+    if (!s || typeof s.count !== "number") return;
+    this.ok = true;
+    try {
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "player" }, (d) => { if (d && d.gen === this.gen) this.apply(d, true); });
+      CAP.nativeCallback("AuroreMusic", "addListener", { eventName: "viz" }, (d) => { if (d) this.onViz(d); });
+    } catch { /* ancienne version */ }
+    document.addEventListener("visibilitychange", () => { this.vizSync(); if (!document.hidden) this.sync(); });
+    if (s.count > 0 && s.id && L.tracks.has(s.id)) this.adopt(s);
+  },
+  adopt(s) {
+    const saved = store.get("nwin", null), same = saved && saved.gen === s.gen && Array.isArray(saved.items);
+    this.gen = s.gen; this.loaded = true; this.pending = null; this.lastState = s.state;
+    this.win = same ? saved.items : (s.ids || []).map((id) => ({ id, src: "?" }));
+    this.cur = same ? (saved.cur || 0) : s.index;
+    Player.enterNative(); Player.id = null; Player.playing = false;
+    this.apply(s);
+  },
+  item(id) {
+    const t = L.tracks.get(id), f = L.files.get(id);
+    return { id, mid: f.mid, title: t.title, artist: t.artist, album: t.album || "", art: t.artKey && L.art.get(t.artKey)?.big ? t.artKey : "" };
+  },
+  playable(id) { return !!(L.files.get(id)?.media && L.tracks.has(id)); },
+  /* titres envoyés au service : 5 précédents, celui qui joue, puis jusqu'à 150 à venir (file d'attente, puis la suite) */
+  window(id) {
+    if (Q.current !== id) return { items: [{ id, src: "c" }], index: 0 };
+    const items = [], ok = (x) => this.playable(x);
+    for (let i = Q.fromManual ? Q.pos : Q.pos - 1; i >= 0 && items.length < 5; i--) { const x = Q.ctx[Q.order[i]]; if (!ok(x)) break; items.unshift({ id: x, src: "o", p: i }); }
+    const index = items.length;
+    items.push({ id, src: Q.fromManual ? "cm" : "c", p: Q.pos });
+    let n = 0;
+    for (const x of Q.manual) { if (!ok(x) || n >= 150) return { items, index }; items.push({ id: x, src: "m" }); n++; }
+    const len = Q.order.length;
+    for (let k = 1; len && n < 150; k++) {
+      let i = Q.pos + k;
+      if (i >= len) { if (Q.repeat !== "all") break; i %= len; }
+      const x = Q.ctx[Q.order[i]]; if (!ok(x)) break;
+      items.push({ id: x, src: "o", p: i }); n++;
+    }
+    return { items, index };
+  },
+  repeatMode() { return Q.repeat === "one" ? 1 : 0; },
+  saveWin() { store.set("nwin", { gen: this.gen, cur: this.cur, items: this.win }); },
+  /* titre choisi mais pas encore lancé (démarrage de l'app) : le service n'est sollicité qu'à la lecture */
+  cue(t) {
+    this.gen = this.newGen(); this.loaded = false; this.pending = { t: t || 0 };
+    if (this.st && this.st.playing) this.call("ppause").catch(() => {});
+  },
+  async load(id, play, startAt) {
+    const gen = (this.gen = this.newGen());
+    this.pending = { t: startAt || 0 };
+    const w = this.window(id);
+    await this.ensureArt([id], 1200);
+    if (gen !== this.gen) return true;
+    let s;
+    try { s = await this.call("pload", { gen, items: w.items.map((m) => this.item(m.id)), index: w.index, pos: Math.round((startAt || 0) * 1000), play, repeat: this.repeatMode() }); }
+    catch { return gen !== this.gen; }
+    if (gen !== this.gen) return true;
+    this.loaded = true; this.pending = null; this.win = w.items; this.cur = w.index; this.lastState = s.state; this.saveWin();
+    this.apply(s); this.artAhead();
+    return true;
+  },
+  /* suit le service : changement de titre (enchaînement, notification, casque), lecture/pause, fin, erreur */
+  apply(s, ev = false) {
+    this.st = s;
+    if (Player.mode !== "native") return;
+    if (s.id && s.id !== Player.id && L.tracks.has(s.id)) {
+      Q.adoptNative(s.id, s.index, s.reason);
+      Player.id = s.id; Player.emit("track", s.id); Player.emit("meta");
+      this.saveWin(); this.artAhead(); this.refreshSoon();
+    } else if (s.id && this.win[s.index] && this.win[s.index].id === s.id) this.cur = s.index;
+    if (s.reason === 0 && Q.session) { Q.creditEnd(); Q.session.counted = false; Q.session.listened = 0; Q.session.last = null; }
+    const playing = !!s.want && (s.state === 2 || s.state === 3);
+    if (playing !== Player.playing) { Player.playing = playing; Player.emit("state"); }
+    /* fin et erreur : seulement sur les évènements du service (les réponses peuvent arriver après) */
+    const ended = ev && s.state === 4 && this.lastState !== 4 && s.count > 0;
+    if (ev || s.state !== 4) this.lastState = s.state;
+    if (ev && s.error) Player.emit("error", Player.id);
+    else if (ended) { Q.creditEnd(); Q.flushSession(); Q.next(true); }
+    this.vizSync();
+  },
+  pos() {
+    const s = this.st;
+    if (!this.loaded || this.pending || !s || s.id !== Player.id) return this.pending ? this.pending.t : 0;
+    let ms = s.pos + (s.playing ? Math.max(0, Date.now() - s.at) : 0);
+    if (s.dur > 0) ms = Math.min(ms, s.dur);
+    return ms / 1000;
+  },
+  async play() {
+    if (!this.loaded) return this.load(Player.id, true, this.pending ? this.pending.t : 0);
+    let s; try { s = await this.call("pplay"); } catch { return; }
+    if (!s.id || s.id !== Player.id || s.gen !== this.gen) return this.load(Player.id, true, this.pos()); /* le service s'était arrêté */
+    this.apply(s);
+  },
+  async pause() {
+    if (!this.loaded) return;
+    try { const s = await this.call("ppause"); if (s.gen === this.gen) this.apply(s); } catch { /* rien */ }
+  },
+  async seek(t) {
+    if (!this.loaded || this.pending) { this.pending = { t }; return; }
+    if (this.st) { this.st = { ...this.st, pos: t * 1000, at: Date.now() }; }
+    try { const s = await this.call("pseek", { pos: Math.round(t * 1000) }); if (s.gen === this.gen) this.apply(s); } catch { /* rien */ }
+  },
+  volume(v) { if (!this.ok || v === this.vol) return; this.vol = v; this.call("pvolume", { volume: v }).catch(() => {}); },
+  stop() { this.gen = this.newGen(); this.loaded = false; this.pending = null; this.vizSync(); this.call("pstop").catch(() => {}); },
+  refreshSoon: debounce(() => NP.refresh(), 400),
+  /* la file a changé (ajout, aléatoire, répétition…) ou le service avance : on met à jour les titres à venir */
+  async refresh() {
+    if (Player.mode !== "native" || !this.loaded || this.pending || !Player.id || !this.playable(Player.id)) return;
+    const w = this.window(Player.id), repeat = this.repeatMode();
+    const same = w.index === this.cur && w.items.length === this.win.length && w.items.every((m, i) => m.id === this.win[i].id) && this.st && repeat === this.st.repeat;
+    if (same) { this.win = w.items; this.saveWin(); return; }
+    const gen = this.gen;
+    try {
+      const s = await this.call("pupdate", { currentId: Player.id, items: w.items.map((m) => this.item(m.id)), index: w.index, repeat });
+      if (gen !== this.gen) return;
+      this.win = w.items; this.cur = s.index; this.saveWin(); this.apply(s); this.artAhead();
+    } catch { /* le titre a changé entre-temps : la mise à jour suivante s'en charge */ }
+  },
+  /* l'app revient à l'écran : on recale la position et l'état */
+  async sync() {
+    if (Player.mode !== "native" || !this.loaded || this.pending) return;
+    let s; try { s = await this.call("pstate", { start: false }); } catch { return; }
+    if (s.gen === this.gen && s.count > 0) return this.apply(s);
+    const t = this.pos(); this.loaded = false; this.pending = { t };
+    if (Player.playing) { Player.playing = false; Player.emit("state"); }
+  },
+  /* pochettes pour la notification et l'écran verrouillé */
+  ensureArt(ids, timeout) {
+    const keys = [...new Set(ids.map((id) => L.tracks.get(id)?.artKey).filter((k) => k && !this.art.has(k) && L.art.get(k)?.big))];
+    if (!keys.length) return Promise.resolve();
+    const work = (this.artQ = this.artQ.then(async () => {
+      let missing = keys;
+      try { missing = (await this.call("partHas", { keys })).missing || []; } catch { return; }
+      for (const k of keys) if (!missing.includes(k)) this.art.add(k);
+      for (const k of missing) {
+        if (this.art.has(k)) continue;
+        const data = await blobB64(L.art.get(k).big);
+        if (data) try { await this.call("part", { key: k, data }); this.art.add(k); } catch { /* tant pis */ }
+      }
+    }).catch(() => {}));
+    return Promise.race([work, sleep(timeout)]);
+  },
+  artAhead() { this.ensureArt(this.win.slice(this.cur, this.cur + 12).map((m) => m.id), 60000); },
+  /* visualiseurs : seulement quand l'app est à l'écran et que la musique joue */
+  vizSync() {
+    const want = Player.mode === "native" && Player.playing && !document.hidden;
+    if (want === this.vizOn) return;
+    this.vizOn = want; this.call("pviz", { on: want }).catch(() => {});
+  },
+  onViz(d) {
+    if (!d.b) return;
+    const b = atob(d.b), w = atob(d.w || "");
+    for (let i = 0; i < 96 && i < b.length; i++) NV.bands[i] = b.charCodeAt(i);
+    for (let i = 0; i < 512 && i < w.length; i++) NV.wave[i] = w.charCodeAt(i);
+    if (d.sr) NV.sr = d.sr;
+    NV.at = performance.now();
   },
 } : null;
 

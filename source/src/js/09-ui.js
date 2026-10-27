@@ -204,7 +204,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
   },
   onLibraryChanged() { this.renderNav(); this.onLibraryProgress(); if (["home", "tracks", "albums", "artists", "album", "artist", "list", "search", "discover"].includes(this.view.name)) this.rerender(); },
   onStatsChanged() { if (this.view.name === "home" && !this.imm) this.rerender(); },
-  onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); },
+  onQueueChanged() { this.renderNP(); if (this.immQueue) this.renderImmQueue(); Q.save(); if (NP && Player.mode === "native") NP.refreshSoon(); },
 
   /* ---- bannière fichiers manquants ---- */
   needFiles() {
@@ -254,7 +254,7 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     const liked = Q.current && L.likes.has(Q.current);
     for (const b of $$(".js-like")) { b.hidden = !Q.current; b.classList.toggle("on", !!liked); b.setAttribute("aria-pressed", !!liked); b.setAttribute("aria-label", liked ? "Retirer des titres likés" : "Ajouter aux titres likés"); }
     document.documentElement.style.setProperty("--eq", Player.playing ? "running" : "paused");
-    if (NativeMedia) NativeMedia.state();
+    if (NativeMedia && Player.mode !== "native") NativeMedia.state();
     try { if (navigator.mediaSession) navigator.mediaSession.playbackState = Player.id ? (Player.playing ? "playing" : "paused") : "none"; } catch { /* ignoré */ }
     this.keepAwake(Player.playing);
     document.documentElement.style.setProperty("--drift", Player.playing && !Viz.calm ? "running" : "paused");
@@ -273,7 +273,8 @@ ${L.playlists.map((p) => { const first = p.ids.map((id) => L.tracks.get(id)).fin
     if (!this.seeking) for (const s of $$(".js-seek")) { s.value = Math.round(p * 1000); s.style.setProperty("--p", p * 100 + "%"); }
     for (const m of $$(".js-mini")) m.style.width = p * 100 + "%";
     const now = performance.now();
-    if (NativeMedia && Player.id && d) NativeMedia.position(d, t);
+    if (Player.mode === "native") { /* notification gérée par le service natif */ }
+    else if (NativeMedia && Player.id && d) NativeMedia.position(d, t);
     else if (Player.id && d && navigator.mediaSession?.setPositionState && (!this._posAt || now - this._posAt > 1000)) {
       this._posAt = now;
       try { navigator.mediaSession.setPositionState({ duration: d, playbackRate: 1, position: clamp(t, 0, d) }); } catch { /* ignoré */ }
@@ -456,7 +457,7 @@ ${up.length ? html`<div class="q-sec"><h3><span>Ensuite depuis : ${Q.label || "t
   renderImmQueue() { const q = $("#imm .imm-queue"); if (q) { q.hidden = !this.immQueue; if (this.immQueue) setHTML(q, this.queueHTML(Q.upcoming(40))); } },
 
   mediaSession(t) {
-    if (NativeMedia) { NativeMedia.track(t); return; }
+    if (NativeMedia) { if (Player.mode !== "native") NativeMedia.track(t); return; }
     const ms = navigator.mediaSession; if (!ms) return;
     try {
       ms.metadata = t ? new MediaMetadata({ title: t.title, artist: t.artist, album: t.album || "", artwork: artBig(t.artKey) ? [{ src: artBig(t.artKey), sizes: "640x640", type: "image/webp" }] : [] }) : null;

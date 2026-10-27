@@ -9,12 +9,22 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.Base64;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
+import androidx.annotation.OptIn;
+import androidx.media3.common.C;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.MediaMetadata;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.common.util.UnstableApi;
+import androidx.media3.exoplayer.ExoPlayer;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.JSArray;
@@ -27,17 +37,24 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * aurore : trouve la musique du téléphone (comme les autres lecteurs Android) et la sert au lecteur
  * à l'adresse /_aurore_media_/<id>, avec la prise en charge des plages d'octets pour avancer dans un titre.
+ * Pilote aussi le lecteur natif (AuroreService), qui continue de jouer quand l'app est fermée.
  */
+@OptIn(markerClass = UnstableApi.class)
 @CapacitorPlugin(
     name = "AuroreMusic",
     permissions = {
@@ -54,12 +71,487 @@ public class AuroreMusicPlugin extends Plugin {
         return Build.VERSION.SDK_INT >= 33 ? "audio" : "storage";
     }
 
+    private final Handler main = new Handler(Looper.getMainLooper());
+
     @Override
     public void load() {
         final Bridge b = getBridge();
         final Context ctx = getContext();
         // après l'initialisation complète du pont : notre client remplace celui de Capacitor et lui délègue le reste
-        new Handler(Looper.getMainLooper()).post(() -> b.setWebViewClient(new MediaClient(b, ctx)));
+        main.post(() -> b.setWebViewClient(new MediaClient(b, ctx)));
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        vizOn = false;
+        AuroreService.TAP.setActive(false);
+        if (vizThread != null) {
+            vizThread.quitSafely();
+            vizThread = null;
+            vizHandler = null;
+        }
+        main.post(() -> {
+            if (attached != null) attached.removeListener(listener);
+            attached = null;
+        });
+    }
+
+    /* ===================== lecteur natif ===================== */
+
+    interface Op {
+        void run(ExoPlayer p) throws Exception;
+    }
+
+    private ExoPlayer attached;
+    /** numéro de la file envoyée par l'app : les évènements d'une ancienne file sont ignorés côté app */
+    private int gen = 0;
+    private String lastError;
+    private volatile boolean vizPlaying;
+
+    private final Player.Listener listener = new Player.Listener() {
+        private int reason = -1;
+
+        @Override
+        public void onMediaItemTransition(MediaItem mediaItem, int r) {
+            reason = r;
+        }
+
+        @Override
+        public void onPlayerError(PlaybackException error) {
+            lastError = error.getErrorCodeName();
+        }
+
+        @Override
+        public void onEvents(Player p, Player.Events events) {
+            vizPlaying = p.isPlaying();
+            if (!events.containsAny(
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_IS_PLAYING_CHANGED,
+                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_POSITION_DISCONTINUITY,
+                Player.EVENT_PLAYER_ERROR,
+                Player.EVENT_REPEAT_MODE_CHANGED
+            )) return;
+            int r = events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ? reason : -1;
+            notifyListeners("player", state(p, false, r));
+            lastError = null;
+        }
+    };
+
+    private void attach(ExoPlayer p) {
+        if (attached == p) return;
+        if (attached != null) attached.removeListener(listener);
+        p.addListener(listener);
+        attached = p;
+        vizPlaying = p.isPlaying();
+    }
+
+    /** lance le service de lecture si besoin, puis exécute op sur le fil principal */
+    private void withPlayer(final PluginCall call, final Op op) {
+        main.post(() -> tryRun(call, op, 0));
+    }
+
+    private void tryRun(final PluginCall call, final Op op, final int tries) {
+        AuroreService s = AuroreService.instance;
+        if (s != null && s.player != null) {
+            attach(s.player);
+            try {
+                op.run(s.player);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "Erreur du lecteur", "PLAYER");
+            }
+            return;
+        }
+        if (tries == 0) {
+            try {
+                getContext().startService(new Intent(getContext(), AuroreService.class));
+            } catch (Exception e) {
+                call.reject("Service de lecture indisponible", "NO_SERVICE");
+                return;
+            }
+        }
+        if (tries > 80) {
+            call.reject("Service de lecture indisponible", "NO_SERVICE");
+            return;
+        }
+        main.postDelayed(() -> tryRun(call, op, tries + 1), 50);
+    }
+
+    private JSObject state(Player p, boolean withIds, int reason) {
+        JSObject o = new JSObject();
+        MediaItem m = p.getCurrentMediaItem();
+        o.put("gen", gen);
+        o.put("id", m != null ? m.mediaId : "");
+        o.put("index", p.getCurrentMediaItemIndex());
+        o.put("count", p.getMediaItemCount());
+        o.put("playing", p.isPlaying());
+        o.put("want", p.getPlayWhenReady());
+        o.put("state", p.getPlaybackState());
+        o.put("pos", Math.max(0, p.getCurrentPosition()));
+        long d = p.getDuration();
+        o.put("dur", d == C.TIME_UNSET ? -1 : d);
+        o.put("at", System.currentTimeMillis());
+        o.put("repeat", p.getRepeatMode());
+        if (reason >= 0) o.put("reason", reason);
+        if (lastError != null) o.put("error", lastError);
+        if (withIds) {
+            JSArray ids = new JSArray();
+            for (int i = 0; i < p.getMediaItemCount(); i++) ids.put(p.getMediaItemAt(i).mediaId);
+            o.put("ids", ids);
+        }
+        return o;
+    }
+
+    private File artFile(String key) {
+        String safe = key.replaceAll("[^A-Za-z0-9_-]", "_");
+        if (safe.length() > 80) safe = safe.substring(0, 80);
+        return new File(new File(getContext().getCacheDir(), "art"), safe + ".img");
+    }
+
+    private List<MediaItem> items(PluginCall call) throws JSONException {
+        JSArray arr = call.getArray("items");
+        List<MediaItem> list = new ArrayList<>();
+        if (arr == null) return list;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.getJSONObject(i);
+            Uri uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, o.getLong("mid"));
+            MediaMetadata.Builder md = new MediaMetadata.Builder()
+                .setTitle(o.optString("title", ""))
+                .setArtist(o.optString("artist", ""))
+                .setAlbumTitle(o.optString("album", ""));
+            String art = o.optString("art", "");
+            if (!art.isEmpty()) md.setArtworkUri(Uri.fromFile(artFile(art)));
+            list.add(new MediaItem.Builder().setMediaId(o.getString("id")).setUri(uri).setMediaMetadata(md.build()).build());
+        }
+        return list;
+    }
+
+    /** remplace la file : titres à venir (et quelques précédents), titre de départ, position, lecture */
+    @PluginMethod
+    public void pload(final PluginCall call) {
+        final List<MediaItem> list;
+        try {
+            list = items(call);
+        } catch (JSONException e) {
+            call.reject("File invalide", "BAD_QUEUE");
+            return;
+        }
+        if (list.isEmpty()) {
+            call.reject("File vide", "BAD_QUEUE");
+            return;
+        }
+        final int g = call.getInt("gen", 0);
+        final int index = Math.max(0, Math.min(list.size() - 1, call.getInt("index", 0)));
+        final long pos = Math.max(0L, Math.round(call.getDouble("pos", 0.0)));
+        final boolean play = call.getBoolean("play", true);
+        final int repeat = call.getInt("repeat", Player.REPEAT_MODE_OFF);
+        withPlayer(call, (p) -> {
+            gen = g;
+            lastError = null;
+            p.setRepeatMode(repeat);
+            p.setMediaItems(list, index, pos);
+            p.prepare();
+            p.setPlayWhenReady(play);
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    /** met à jour les titres autour de celui qui joue, sans le couper */
+    @PluginMethod
+    public void pupdate(final PluginCall call) {
+        final List<MediaItem> list;
+        try {
+            list = items(call);
+        } catch (JSONException e) {
+            call.reject("File invalide", "BAD_QUEUE");
+            return;
+        }
+        final String current = call.getString("currentId", "");
+        final int index = call.getInt("index", 0);
+        final int repeat = call.getInt("repeat", Player.REPEAT_MODE_OFF);
+        withPlayer(call, (p) -> {
+            MediaItem now = p.getCurrentMediaItem();
+            if (now == null || index < 0 || index >= list.size() || !now.mediaId.equals(current) || !list.get(index).mediaId.equals(current)) {
+                call.reject("Le titre a changé", "MISMATCH");
+                return;
+            }
+            int ci = p.getCurrentMediaItemIndex();
+            int n = p.getMediaItemCount();
+            if (ci + 1 < n) p.removeMediaItems(ci + 1, n);
+            if (ci > 0) p.removeMediaItems(0, ci);
+            List<MediaItem> after = new ArrayList<>(list.subList(index + 1, list.size()));
+            List<MediaItem> before = new ArrayList<>(list.subList(0, index));
+            if (!after.isEmpty()) p.addMediaItems(after);
+            if (!before.isEmpty()) p.addMediaItems(0, before);
+            p.setRepeatMode(repeat);
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    @PluginMethod
+    public void pplay(final PluginCall call) {
+        withPlayer(call, (p) -> {
+            if (p.getMediaItemCount() > 0) {
+                if (p.getPlaybackState() == Player.STATE_IDLE) p.prepare();
+                if (p.getPlaybackState() == Player.STATE_ENDED) p.seekTo(p.getCurrentMediaItemIndex(), 0);
+                p.play();
+            }
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    @PluginMethod
+    public void ppause(final PluginCall call) {
+        withPlayer(call, (p) -> {
+            p.pause();
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    @PluginMethod
+    public void pseek(final PluginCall call) {
+        final long pos = Math.max(0L, Math.round(call.getDouble("pos", 0.0)));
+        withPlayer(call, (p) -> {
+            if (p.getMediaItemCount() > 0) p.seekTo(pos);
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    @PluginMethod
+    public void prepeat(final PluginCall call) {
+        final int repeat = call.getInt("repeat", Player.REPEAT_MODE_OFF);
+        withPlayer(call, (p) -> {
+            p.setRepeatMode(repeat);
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    @PluginMethod
+    public void pvolume(final PluginCall call) {
+        final float v = (float) Math.max(0.0, Math.min(1.0, call.getDouble("volume", 1.0)));
+        withPlayer(call, (p) -> {
+            p.setVolume(v);
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void pstop(final PluginCall call) {
+        withPlayer(call, (p) -> {
+            p.stop();
+            p.clearMediaItems();
+            call.resolve(state(p, false, -1));
+        });
+    }
+
+    /** état du lecteur ; avec start=false, ne lance pas le service s'il ne tourne pas (démarrage de l'app) */
+    @PluginMethod
+    public void pstate(final PluginCall call) {
+        if (!call.getBoolean("start", true)) {
+            main.post(() -> {
+                AuroreService s = AuroreService.instance;
+                if (s != null && s.player != null) {
+                    attach(s.player);
+                    call.resolve(state(s.player, true, -1));
+                } else {
+                    JSObject o = new JSObject();
+                    o.put("gen", 0);
+                    o.put("id", "");
+                    o.put("count", 0);
+                    o.put("index", 0);
+                    o.put("ids", new JSArray());
+                    call.resolve(o);
+                }
+            });
+            return;
+        }
+        withPlayer(call, (p) -> call.resolve(state(p, true, -1)));
+    }
+
+    /* ---- pochettes pour la notification et l'écran verrouillé ---- */
+
+    @PluginMethod
+    public void partHas(PluginCall call) {
+        JSArray keys = call.getArray("keys");
+        JSArray missing = new JSArray();
+        if (keys != null) for (int i = 0; i < keys.length(); i++) {
+            String k = keys.optString(i, "");
+            if (!k.isEmpty() && !artFile(k).exists()) missing.put(k);
+        }
+        JSObject r = new JSObject();
+        r.put("missing", missing);
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void part(PluginCall call) {
+        String key = call.getString("key", "");
+        String data = call.getString("data", "");
+        if (key.isEmpty() || data.isEmpty()) {
+            call.reject("Pochette invalide");
+            return;
+        }
+        try {
+            File f = artFile(key);
+            File dir = f.getParentFile();
+            if (dir != null && !dir.exists()) dir.mkdirs();
+            if (!f.exists()) {
+                byte[] bytes = Base64.decode(data, Base64.DEFAULT);
+                File tmp = new File(dir, f.getName() + ".tmp");
+                try (FileOutputStream out = new FileOutputStream(tmp)) {
+                    out.write(bytes);
+                }
+                if (!tmp.renameTo(f)) tmp.delete();
+                pruneArt(dir);
+            }
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("Pochette non enregistrée");
+        }
+    }
+
+    private void pruneArt(File dir) {
+        File[] all = dir != null ? dir.listFiles() : null;
+        if (all == null || all.length <= 800) return;
+        Arrays.sort(all, (a, b) -> Long.compare(a.lastModified(), b.lastModified()));
+        for (int i = 0; i < all.length - 600; i++) all[i].delete();
+    }
+
+    /* ---- visualiseurs : spectre et onde calculés ici, envoyés ~30 fois par seconde quand l'app est à l'écran ---- */
+
+    private static final int N = 4096;
+    private static final int BANDS = 96;
+    private HandlerThread vizThread;
+    private volatile Handler vizHandler;
+    private volatile boolean vizOn;
+    private final float[] vbuf = new float[N];
+    private final float[] re = new float[N];
+    private final float[] im = new float[N];
+    private final float[] smooth = new float[N / 2];
+    private final float[] win = new float[N];
+    private final float[] cosT = new float[N / 2];
+    private final float[] sinT = new float[N / 2];
+    private int[] b0, b1;
+    private int bandsRate = 0;
+
+    {
+        for (int i = 0; i < N; i++) win[i] = (float) (0.42 - 0.5 * Math.cos(2 * Math.PI * i / N) + 0.08 * Math.cos(4 * Math.PI * i / N));
+        for (int i = 0; i < N / 2; i++) {
+            cosT[i] = (float) Math.cos(-2 * Math.PI * i / N);
+            sinT[i] = (float) Math.sin(-2 * Math.PI * i / N);
+        }
+    }
+
+    private final Runnable vizTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!vizOn) return;
+            if (vizPlaying) {
+                try {
+                    computeViz();
+                } catch (Exception ignored) {
+                    // une image de visualiseur en moins
+                }
+            }
+            Handler h = vizHandler;
+            if (h != null && vizOn) h.postDelayed(this, 33);
+        }
+    };
+
+    @PluginMethod
+    public void pviz(PluginCall call) {
+        boolean on = call.getBoolean("on", false);
+        AuroreService.TAP.setActive(on);
+        vizOn = on;
+        if (on) {
+            if (vizThread == null) {
+                vizThread = new HandlerThread("aurore-viz");
+                vizThread.start();
+                vizHandler = new Handler(vizThread.getLooper());
+            }
+            vizHandler.removeCallbacks(vizTick);
+            vizHandler.post(vizTick);
+        } else if (vizHandler != null) {
+            vizHandler.removeCallbacks(vizTick);
+        }
+        call.resolve();
+    }
+
+    private void computeViz() {
+        int sr = AuroreService.TAP.snapshot(vbuf);
+        if (sr <= 0) return;
+        if (sr != bandsRate) {
+            bandsRate = sr;
+            b0 = new int[BANDS];
+            b1 = new int[BANDS];
+            double binHz = sr / (double) N;
+            for (int i = 0; i < BANDS; i++) {
+                double f0 = 32 * Math.pow(16000.0 / 32, i / (double) BANDS), f1 = 32 * Math.pow(16000.0 / 32, (i + 1) / (double) BANDS);
+                b0[i] = (int) Math.floor(f0 / binHz);
+                b1[i] = Math.max(b0[i] + 1, (int) Math.ceil(f1 / binHz));
+            }
+            Arrays.fill(smooth, 0f);
+        }
+        for (int i = 0; i < N; i++) {
+            re[i] = vbuf[i] * win[i];
+            im[i] = 0f;
+        }
+        fft(re, im);
+        for (int k = 0; k < N / 2; k++) {
+            float m = (float) Math.sqrt(re[k] * re[k] + im[k] * im[k]) / N;
+            smooth[k] = 0.5f * smooth[k] + 0.5f * m;
+        }
+        byte[] bands = new byte[BANDS];
+        for (int i = 0; i < BANDS; i++) {
+            float mx = 0f;
+            for (int b = b0[i]; b < b1[i] && b < N / 2; b++) if (smooth[b] > mx) mx = smooth[b];
+            int v = 0;
+            if (mx > 0f) v = (int) Math.round((20 * Math.log10(mx) + 100) * 255 / 70);
+            bands[i] = (byte) Math.max(0, Math.min(255, v));
+        }
+        byte[] wave = new byte[512];
+        for (int i = 0; i < 512; i++) {
+            int v = Math.round(128 + 128 * vbuf[i * 8]);
+            wave[i] = (byte) Math.max(0, Math.min(255, v));
+        }
+        JSObject o = new JSObject();
+        o.put("b", Base64.encodeToString(bands, Base64.NO_WRAP));
+        o.put("w", Base64.encodeToString(wave, Base64.NO_WRAP));
+        o.put("sr", sr);
+        notifyListeners("viz", o);
+    }
+
+    /** transformée de Fourier rapide (radix 2, sur place) */
+    private void fft(float[] xr, float[] xi) {
+        int n = xr.length;
+        for (int i = 1, j = 0; i < n; i++) {
+            int bit = n >> 1;
+            for (; (j & bit) != 0; bit >>= 1) j ^= bit;
+            j ^= bit;
+            if (i < j) {
+                float t = xr[i];
+                xr[i] = xr[j];
+                xr[j] = t;
+                t = xi[i];
+                xi[i] = xi[j];
+                xi[j] = t;
+            }
+        }
+        for (int len = 2; len <= n; len <<= 1) {
+            int half = len >> 1, step = n / len;
+            for (int i = 0; i < n; i += len) {
+                for (int k = 0; k < half; k++) {
+                    float wr = cosT[k * step], wi = sinT[k * step];
+                    int a = i + k, b = a + half;
+                    float tr = xr[b] * wr - xi[b] * wi, ti = xr[b] * wi + xi[b] * wr;
+                    xr[b] = xr[a] - tr;
+                    xi[b] = xi[a] - ti;
+                    xr[a] += tr;
+                    xi[a] += ti;
+                }
+            }
+        }
     }
 
     @PluginMethod

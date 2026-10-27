@@ -294,7 +294,7 @@ function bindEvents() {
   });
   setInterval(() => Q.tick(), 250);
   setInterval(() => { if (Player.playing) Q.save(); }, 5000);
-  window.addEventListener("pagehide", () => { Q.flushSession(); Q.save(); });
+  window.addEventListener("pagehide", () => { Q.flushSession(); Q.saveNow(); });
   matchMedia("(max-width: 1240px)").addEventListener("change", () => { $("#app").classList.remove("np-open"); $("#app").classList.toggle("np-off", !matchMedia("(max-width: 1240px)").matches && !UI.npOpen); });
 }
 
@@ -315,6 +315,7 @@ async function boot() {
   UI.render(); UI.onLibraryProgress();
   setTimeout(() => { document.documentElement.classList.add("booted"); setTimeout(() => $("#boot")?.remove(), 600); }, Math.max(0, 900 - performance.now()));
   Q.restore();
+  if (NP) await NP.boot(); /* Android : la musique jouait peut-être encore, app fermée */
   UI.bindImmGestures();
   Install.init();
   window.addEventListener("popstate", () => UI.onPop());
@@ -354,5 +355,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV };
 boot();
