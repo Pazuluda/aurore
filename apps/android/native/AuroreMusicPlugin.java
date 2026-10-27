@@ -378,6 +378,183 @@ public class AuroreMusicPlugin extends Plugin {
         call.resolve();
     }
 
+    /* ---- lien Wi-Fi avec aurore sur le PC ---- */
+
+    /** cherche aurore sur le réseau de la maison (message envoyé à tout le réseau, réponses pendant 2 s) */
+    @PluginMethod
+    public void lanDiscover(final PluginCall call) {
+        new Thread(() -> {
+            JSArray found = new JSArray();
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            try (java.net.DatagramSocket sock = new java.net.DatagramSocket()) {
+                sock.setBroadcast(true);
+                sock.setSoTimeout(300);
+                byte[] msg = "AURORE?".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                List<java.net.InetAddress> targets = new ArrayList<>();
+                targets.add(java.net.InetAddress.getByName("255.255.255.255"));
+                java.util.Enumeration<java.net.NetworkInterface> ifs = java.net.NetworkInterface.getNetworkInterfaces();
+                while (ifs != null && ifs.hasMoreElements()) {
+                    java.net.NetworkInterface ni = ifs.nextElement();
+                    if (!ni.isUp() || ni.isLoopback()) continue;
+                    for (java.net.InterfaceAddress ia : ni.getInterfaceAddresses()) if (ia.getBroadcast() != null) targets.add(ia.getBroadcast());
+                }
+                long end = System.currentTimeMillis() + 2000;
+                int round = 0;
+                byte[] buf = new byte[2048];
+                while (System.currentTimeMillis() < end) {
+                    if (round++ % 3 == 0) for (java.net.InetAddress t : targets) {
+                        try { sock.send(new java.net.DatagramPacket(msg, msg.length, t, 47131)); } catch (Exception ignored) { /* interface sans diffusion */ }
+                    }
+                    try {
+                        java.net.DatagramPacket pk = new java.net.DatagramPacket(buf, buf.length);
+                        sock.receive(pk);
+                        JSONObject o = new JSONObject(new String(pk.getData(), 0, pk.getLength(), java.nio.charset.StandardCharsets.UTF_8));
+                        if (!"aurore".equals(o.optString("app")) || !seen.add(o.optString("id"))) continue;
+                        JSObject pc = new JSObject();
+                        pc.put("id", o.optString("id"));
+                        pc.put("name", o.optString("name", "PC"));
+                        pc.put("port", o.optInt("port", 47130));
+                        pc.put("host", pk.getAddress().getHostAddress());
+                        found.put(pc);
+                    } catch (java.net.SocketTimeoutException ignored) {
+                        // on renvoie la question
+                    }
+                }
+            } catch (Exception ignored) {
+                // pas de Wi-Fi
+            }
+            JSObject r = new JSObject();
+            r.put("pcs", found);
+            call.resolve(r);
+        }, "aurore-lan").start();
+    }
+
+    private java.net.HttpURLConnection lanConn(String url, String method, String token, int timeout) throws IOException {
+        if (!url.startsWith("http://") && !url.startsWith("https://")) throw new IOException("adresse");
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setRequestMethod(method);
+        c.setConnectTimeout(Math.min(timeout, 5000));
+        c.setReadTimeout(timeout);
+        if (token != null && !token.isEmpty()) c.setRequestProperty("X-Aurore-Token", token);
+        return c;
+    }
+
+    private static String readAll(InputStream in, int max) throws IOException {
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[16384];
+        int n;
+        while ((n = in.read(buf)) > 0) { out.write(buf, 0, n); if (out.size() > max) throw new IOException("trop gros"); }
+        return out.toString("UTF-8");
+    }
+
+    /** requête vers aurore sur le PC (texte JSON) */
+    @PluginMethod
+    public void lanFetch(final PluginCall call) {
+        final String url = call.getString("url", ""), method = call.getString("method", "GET"), body = call.getString("body", ""), token = call.getString("token", "");
+        final int timeout = call.getInt("timeout", 6000);
+        new Thread(() -> {
+            java.net.HttpURLConnection c = null;
+            try {
+                c = lanConn(url, method, token, timeout);
+                if (!"GET".equals(method)) {
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+                    byte[] b = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    c.setFixedLengthStreamingMode(b.length);
+                    try (java.io.OutputStream o = c.getOutputStream()) { o.write(b); }
+                }
+                int code = c.getResponseCode();
+                InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                JSObject r = new JSObject();
+                r.put("status", code);
+                r.put("body", in != null ? readAll(in, 30_000_000) : "");
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("PC injoignable", "UNREACHABLE");
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }, "aurore-lan").start();
+    }
+
+    /** envoie un titre du téléphone vers le PC */
+    @PluginMethod
+    public void lanUpload(final PluginCall call) {
+        final String url = call.getString("url", ""), token = call.getString("token", "");
+        final long mid = (long) (double) call.getDouble("mid", -1.0);
+        new Thread(() -> {
+            java.net.HttpURLConnection c = null;
+            try {
+                Uri cu = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mid);
+                c = lanConn(url, "POST", token, 120000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/octet-stream");
+                c.setChunkedStreamingMode(65536);
+                try (InputStream in = getContext().getContentResolver().openInputStream(cu); java.io.OutputStream o = c.getOutputStream()) {
+                    if (in == null) throw new IOException("fichier");
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                }
+                int code = c.getResponseCode();
+                JSObject r = new JSObject();
+                r.put("status", code);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Envoi impossible", "UPLOAD");
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }, "aurore-lan").start();
+    }
+
+    /** reçoit un titre du PC et le range dans Musique/aurore (visible par toutes les apps) */
+    @PluginMethod
+    public void lanDownload(final PluginCall call) {
+        if (Build.VERSION.SDK_INT < 29) {
+            call.reject("Android 10 minimum", "ANDROID_9");
+            return;
+        }
+        final String url = call.getString("url", ""), token = call.getString("token", "");
+        final String name = call.getString("name", "titre.mp3").replaceAll("[\\/:*?\"<>|]", "_");
+        new Thread(() -> {
+            java.net.HttpURLConnection c = null;
+            Uri item = null;
+            ContentResolver cr = getContext().getContentResolver();
+            try {
+                c = lanConn(url, "GET", token, 120000);
+                if (c.getResponseCode() != 200) throw new IOException("HTTP " + c.getResponseCode());
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(MediaStore.Audio.Media.DISPLAY_NAME, name);
+                v.put(MediaStore.Audio.Media.RELATIVE_PATH, "Music/aurore");
+                v.put(MediaStore.Audio.Media.IS_PENDING, 1);
+                String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1).toLowerCase() : "mp3";
+                String mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+                if (mime != null) v.put(MediaStore.Audio.Media.MIME_TYPE, mime);
+                item = cr.insert(MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), v);
+                if (item == null) throw new IOException("MediaStore");
+                try (InputStream in = c.getInputStream(); java.io.OutputStream o = cr.openOutputStream(item)) {
+                    if (o == null) throw new IOException("écriture");
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                }
+                android.content.ContentValues done = new android.content.ContentValues();
+                done.put(MediaStore.Audio.Media.IS_PENDING, 0);
+                cr.update(item, done, null, null);
+                JSObject r = new JSObject();
+                r.put("ok", true);
+                r.put("id", ContentUris.parseId(item));
+                call.resolve(r);
+            } catch (Exception e) {
+                if (item != null) try { cr.delete(item, null, null); } catch (Exception ignored) { /* rien */ }
+                call.reject("Réception impossible", "DOWNLOAD");
+            } finally {
+                if (c != null) c.disconnect();
+            }
+        }, "aurore-lan").start();
+    }
+
     /* ---- mise à jour de l'app, entièrement dans l'app ---- */
 
     private volatile boolean updating;

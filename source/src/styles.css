@@ -857,3 +857,39 @@ html.booted #boot { opacity: 0; visibility: hidden; }
 .edit-note { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 12.5px; color: var(--text-3); }
 .edit-actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .edit-actions .btn { min-height: 44px; }
+
+/* ---------- PC ↔ téléphone ---------- */
+.lan { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.lan-intro { margin: 0; color: var(--text-2); font-size: 14.5px; line-height: 1.5; }
+.lan-big { min-height: 48px; justify-content: center; }
+.lan-note { display: flex; gap: 10px; align-items: flex-start; margin: 0; font-size: 13px; color: var(--text-3); line-height: 1.45; }
+.lan-note .ic { flex: none; margin-top: 2px; }
+.lan-steps { margin: 0; padding-left: 20px; color: var(--text-2); font-size: 14px; line-height: 1.55; display: grid; gap: 6px; }
+.lan-code { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px; border-radius: 18px; text-align: center; background: radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--c1) 22%, transparent), transparent), rgb(var(--hl) / .04); border: 1px solid var(--line-2); }
+.lan-code b { font-size: clamp(40px, 9vw, 54px); letter-spacing: .08em; color: var(--text); }
+.lan-code small { color: var(--text-3); font-size: 12.5px; }
+.lan-list { display: flex; flex-direction: column; gap: 8px; }
+.lan-pc, .lan-tile { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: rgb(var(--hl) / .04); text-align: left; transition: border-color var(--t-fast), background var(--t-fast); }
+.lan-pc:hover, .lan-tile:hover { border-color: var(--c1); background: color-mix(in srgb, var(--c1) 10%, transparent); }
+.lan-pc span, .lan-tile span { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.lan-pc small, .lan-tile small { color: var(--text-3); font-size: 12.5px; }
+.lan-tile > .ic:first-child { width: 22px; height: 22px; color: var(--c1); }
+.lan-pair { display: flex; gap: 10px; align-items: flex-end; }
+.lan-pair .field input { font: 700 22px var(--f-mono); letter-spacing: .2em; text-align: center; }
+.lan-pair .btn { min-height: 44px; }
+.remote { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.rm-top { display: flex; align-items: center; gap: 10px; width: 100%; }
+.rm-status { margin-left: auto; font-size: 12.5px; color: var(--text-3); }
+.rm-art { width: min(62vw, 240px); aspect-ratio: 1; border-radius: 20px; overflow: hidden; display: grid; place-items: center; background: linear-gradient(135deg, var(--c1), var(--c2)); box-shadow: 0 24px 50px -24px var(--c1); }
+.rm-art img { width: 100%; height: 100%; object-fit: cover; }
+.rm-art .ph { color: rgb(255 255 255 / .9); }
+.rm-meta { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; max-width: 100%; }
+.rm-title { font: 800 20px/1.2 var(--f-display); letter-spacing: -.02em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-artist { color: var(--text-2); font-size: 14px; }
+.remote .d-seek { width: 100%; }
+.rm-ctrls { gap: 14px; }
+.rm-ctrls .on { color: var(--c1); }
+.rm-vol { display: flex; align-items: center; gap: 10px; width: 100%; color: var(--text-3); }
+.rm-up { display: flex; flex-direction: column; gap: 4px; width: 100%; font-size: 13px; color: var(--text-2); }
+.rm-up small { color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; }
+.rm-up em { color: var(--text-3); font-style: normal; }

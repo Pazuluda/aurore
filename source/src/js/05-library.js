@@ -149,6 +149,7 @@ function rebuildIndex() {
   ).map((t) => t.id);
   L.sorted.albums = [...albums.values()].sort((a, b) => cmp(sortKey(a.artist), sortKey(b.artist)) || (a.year - b.year) || cmp(a.title, b.title)).map((a) => a.key);
   L.sorted.artists = [...artists.values()].sort((a, b) => cmp(artistSortKey(a.name), artistSortKey(b.name))).map((a) => a.key);
+  if (L.peers && Object.keys(L.peers).length) rebuildPeerPlays();
   L.version++;
 }
 
@@ -169,18 +170,20 @@ function countPlay(id) {
   L.history.push([id, Date.now()]);
   saveStats();
 }
-const playsOf = (id) => L.stats[id]?.p || 0;
+const playsOf = (id) => (L.stats[id]?.p || 0) + (L.peerPlays?.get(id) || 0);
 function topArtists(n = 10) {
   const score = new Map();
   for (const [id, s] of Object.entries(L.stats)) {
     const t = L.tracks.get(id); if (!t || t.demo) continue;
     for (const a of t.artists) score.set(norm(a), (score.get(norm(a)) || 0) + s.p);
   }
+  for (const [id, p] of L.peerPlays || []) { const t = L.tracks.get(id); if (!t || t.demo) continue; for (const a of t.artists) score.set(norm(a), (score.get(norm(a)) || 0) + p); }
   return [...score.entries()].filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1]).slice(0, n)
     .map(([k, p]) => ({ artist: L.artists.get(k), plays: p })).filter((x) => x.artist);
 }
 function topTracks(n = 50) {
-  return Object.entries(L.stats).filter(([id, s]) => s.p > 0 && L.tracks.has(id)).sort((a, b) => b[1].p - a[1].p || b[1].l - a[1].l).slice(0, n).map(([id]) => id);
+  const ids = new Set([...Object.keys(L.stats), ...(L.peerPlays ? L.peerPlays.keys() : [])]);
+  return [...ids].filter((id) => L.tracks.has(id) && playsOf(id) > 0).sort((a, b) => playsOf(b) - playsOf(a) || (L.stats[b]?.l || 0) - (L.stats[a]?.l || 0)).slice(0, n);
 }
 function recentAlbums(n = 12) {
   const seen = new Set(), out = [];
@@ -203,7 +206,7 @@ async function loadLibrary() {
   for (const [k, a] of arts) L.art.set(k, a);
   const K = Object.fromEntries(kv);
   L.stats = K.stats || {}; L.likes = new Set(K.likes || []); L.playlists = K.playlists || [];
-  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K);
+  L.history = K.history || []; L.days = K.days || {}; L.saved = K.saved || []; Edit.load(K); L.syncState = K.syncState || null; L.peers = K.peers || {};
   L.memorize = !!K.memorize; L.rootName = K.root || ""; L.dirHandle = K.dirHandle || null;
   if (L.memorize) for (const [id, blob] of await DB.all("files")) if (L.tracks.has(id)) L.files.set(id, blob);
   rebuildIndex();

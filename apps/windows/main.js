@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require("electron")
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
+const { createLan } = require("./lan");
 
 const AUDIO = /\.(mp3|flac|m4a|m4b|mp4|aac|ogg|oga|opus|wav|wave|webm|weba|aif|aiff)$/i;
 const IMAGE = /\.(jpe?g|png|webp|gif)$/i;
@@ -201,6 +202,26 @@ ipcMain.handle("aurore:update-install", () => {
   return true;
 });
 
+/* lien Wi-Fi avec le téléphone : les demandes qui concernent le lecteur sont transmises à la fenêtre */
+let lan = null;
+const asks = new Map(); let askSeq = 0;
+function askRenderer(kind, payload) {
+  return new Promise((resolve, reject) => {
+    if (!win || !rendererReady) return reject(new Error("aurore n'est pas ouverte"));
+    const rid = ++askSeq; const t = setTimeout(() => { asks.delete(rid); reject(new Error("pas de réponse")); }, 15000);
+    asks.set(rid, { resolve: (v) => { clearTimeout(t); resolve(v); } });
+    win.webContents.send("aurore:lan-ask", { rid, kind, payload });
+  }).then((r) => {
+    if (kind === "file" && r && r.path && !allowed(r.path)) return null;
+    return r;
+  });
+}
+ipcMain.on("aurore:lan-reply", (_e, rid, result) => { const a = asks.get(rid); if (a) { asks.delete(rid); a.resolve(result); } });
+ipcMain.handle("aurore:lan-info", () => (lan ? lan.info() : { on: false, phones: [] }));
+ipcMain.handle("aurore:lan-code", () => { lan.newCode(); return lan.info(); });
+ipcMain.handle("aurore:lan-stop", () => { lan.stop(); return lan.info(); });
+ipcMain.handle("aurore:lan-forget", (_e, id) => { lan.forget(String(id)); return lan.info(); });
+
 function createWindow() {
   const w = config.window || {};
   win = new BrowserWindow({
@@ -236,6 +257,11 @@ else {
     Menu.setApplicationMenu(null);
     loadConfig();
     watchFolders();
+    lan = createLan({
+      getConfig: () => config, saveConfig, library: () => library, freeName,
+      ask: askRenderer,
+      notify: (ev) => { if (win && rendererReady) win.webContents.send("aurore:lan-event", ev); },
+    });
     setupUpdater();
     pendingFiles = filesFromArgs(process.argv);
     createWindow();

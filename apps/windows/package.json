@@ -26,6 +26,7 @@
     },
     "files": [
       "main.js",
+      "lan.js",
       "preload.js",
       "icon.png",
       "app/**/*"

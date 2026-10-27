@@ -45,6 +45,8 @@ function trackMenu(at, id, list) {
   if (t.albumKey && !(UI.view.name === "album" && UI.view.param === t.albumKey)) items.push({ icon: "disc", label: "Aller à l'album", fn: () => UI.go("album", t.albumKey) });
   for (const a of t.artists.slice(0, 3)) items.push({ icon: "artist", label: `Aller à ${a}`, fn: () => UI.go("artist", norm(a)) });
   items.push({ icon: "sparkles", label: "Artistes proches", fn: () => discoverFrom(t.artists[0]) });
+  if (LanPC && LanPC.hasPhone && L.files.get(id)?.abs) items.push({ icon: "send", label: "Envoyer au téléphone", fn: () => LanPC.send([id]) });
+  if (LanPhone && LanPhone.pc && L.files.get(id)?.media) items.push({ icon: "send", label: `Envoyer au PC`, fn: () => LanPhone.send([id]) });
   items.push("sep", { icon: "pencil", label: "Modifier les infos", fn: () => Edit.openTrack(id) });
   if (list && list.opts.playlist) { const p = L.playlists.find((x) => x.id === list.opts.playlist); if (p) items.push("sep", { icon: "trash", label: "Retirer de cette playlist", fn: () => { p.ids = p.ids.filter((x) => x !== id); savePlaylists(); UI.renderNav(); UI.rerender(); toast("Retiré de la playlist."); } }); }
   Menu.open(at, items);
@@ -135,6 +137,17 @@ const ACTIONS = {
   "eq-preset": (el) => { const p = EQ_PRESETS.find((x) => x[0] === el.dataset.v); if (p) { if (!Fx.eqOn) Fx.setOn(true); Fx.set(p[2], p[0]); openEq(); } },
   "edit-nopic": () => { const d = new FormData($("#edit-form")); Edit.reset(); Edit.dropPic = true; Edit.render(d.get("title"), d.get("artist"), d.get("album"), d.get("year"), d.get("genre"), ""); },
   "edit-undo": () => Edit.undo(),
+  "lan-open": () => (LanPC || LanPhone).open(),
+  "lan-code": async () => { await NATIVE_WIN.lan.code(); LanPC.refresh(); LanPC.open(); },
+  "lan-stop": async () => { await NATIVE_WIN.lan.stop(); LanPC.open(); },
+  "lan-forget": async (el) => { await NATIVE_WIN.lan.forget(el.dataset.id); await LanPC.refresh(); LanPC.open(); },
+  "lan-find": () => LanPhone.find(),
+  "lan-pick": (el) => LanPhone.pick(el),
+  "lan-sync": async () => { try { if (!(await LanPhone.reach())) return toast(`${LanPhone.pc.name} est introuvable : ouvre aurore sur le PC, sur le même Wi-Fi.`); await LanPhone.sync(false); LanPhone.openPaired(); } catch { toast("La synchro n'a pas marché."); } },
+  "lan-receive": async () => { try { if (!(await LanPhone.reach())) return toast(`${LanPhone.pc.name} est introuvable.`); await LanPhone.receive(false); } catch { toast("Réception impossible pour l'instant."); } },
+  "lan-unpair": () => { LanPhone.pc = null; store.set("pc", null); closeSheet(); toast("PC oublié. Tu peux l'associer à nouveau quand tu veux."); },
+  "remote-open": () => LanPhone.remote(),
+  rm: (el) => LanPhone.cmd(el.dataset.cmd),
   "theme-bg": (el) => { Theme.set(el.dataset.v); openSettings(); },
   "theme-accent": (el) => { Theme.set(null, el.dataset.v); openSettings(); },
   "set-clear": () => { UI.confirmClear = true; openSettings(); },
@@ -198,6 +211,8 @@ ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Garder ma musique dans le l
 ${Install.visible ? html`<div class="set-row"><div><b>Installer l'app</b><p>${IS_MOBILE ? "Icône sur l'écran d'accueil, plein écran, musique écran verrouillé." : "Sa propre fenêtre et ton dossier retrouvé tout seul à chaque lancement."}</p></div>${Install.evt || Install.iosHint ? html`<button class="btn sm primary" data-act="install">Installer</button>` : html`<a class="btn sm" href="${APP_URL}" target="_blank" rel="noopener">Ouvrir</a>`}</div>` : ""}
 ${IS_MOBILE ? "" : html`<div class="set-row"><div><b>Raccourcis clavier</b><p>Espace, flèches, F pour le mode immersif…</p></div><button class="btn sm" data-act="keys">${icon("keyboard", "sm")} Voir</button></div>`}
 ${AndroidMusic ? html`<div class="set-row"><div><b>Musique du téléphone</b><p>${AndroidMusic.perm === "granted" ? `aurore cherche les nouveautés à chaque ouverture (${plural(AndroidMusic.count, "titre trouvé", "titres trouvés")}). Les mémos vocaux, sonneries et messages WhatsApp sont ignorés.` : "aurore n'a pas accès à ta musique : autorise-la pour qu'elle trouve tout seule tes titres."}</p></div><button class="btn sm${AndroidMusic.perm === "granted" ? "" : " primary"}" data-act="media-find">${icon(AndroidMusic.perm === "granted" ? "refresh" : "search", "sm")} ${AndroidMusic.perm === "granted" ? "Rechercher" : "Autoriser"}</button></div>` : ""}
+${LanPC ? html`<div class="set-row"><div><b>Ton téléphone</b><p>Télécommande, échange de titres, mêmes playlists, likes et statistiques, sur le Wi-Fi de la maison.</p></div><button class="btn sm${LanPC.hasPhone ? "" : " primary"}" data-act="lan-open">${icon("phone", "sm")} ${LanPC.hasPhone ? "Gérer" : "Associer"}</button></div>` : ""}
+${LanPhone ? html`<div class="set-row"><div><b>Mon PC</b><p>${LanPhone.pc ? `Associé à ${LanPhone.pc.name} : télécommande, échange de titres, synchro.` : "Pilote la musique de ton PC, échangez des titres, gardez les mêmes playlists, likes et stats (même Wi-Fi)."}</p></div><button class="btn sm${LanPhone.pc ? "" : " primary"}" data-act="lan-open">${icon("monitor", "sm")} ${LanPhone.pc ? "Ouvrir" : "Associer"}</button></div>` : ""}
 ${CAP ? html`<div class="set-row"><div><b>Widget sur l'écran d'accueil</b><p>Appuie longuement sur un espace vide de l'écran d'accueil, choisis « Widgets », puis aurore : pochette, titre et boutons, sans ouvrir l'app.</p></div></div>` : ""}
 ${CAP ? html`<div class="set-row"><div><b>Android Auto</b><p>Retrouve tes playlists, albums et artistes sur l'écran de ta voiture. Un réglage à faire une seule fois, montré pas à pas.</p></div><button class="btn sm primary" data-act="auto-guide">${icon("car", "sm")} Voir le guide</button></div>` : ""}
 ${IS_NATIVE ? "" : html`<div class="set-row"><div><b>Apps Windows et Android</b><p>La même app, sans navigateur : installateur pour ton PC et APK pour ton téléphone.</p></div><a class="btn sm" href="${RELEASES_URL}" target="_blank" rel="noopener">${icon("external", "sm")} Télécharger</a></div>`}
@@ -386,6 +401,8 @@ async function boot() {
   Disc.init();
   await autoReattach();
   setTimeout(() => An.start(), 2500);
+  if (LanPC) { LanPC.init(); LanPC.refresh(); }
+  if (LanPhone) { setTimeout(() => LanPhone.auto(), 4000); document.addEventListener("visibilitychange", () => { if (!document.hidden) LanPhone.auto(); }); }
   if (Q.current && !Player.id && L.files.has(Q.current)) { Q.session = { id: Q.current, listened: 0, counted: false, last: null }; Player.load(Q.current, { autoplay: false, startAt: store.get("q", {})?.t || 0 }); }
   Updates.init();
 }
@@ -411,5 +428,5 @@ if ("launchQueue" in window) {
     if (ids.length) Q.playList(ids, 0, ids.length > 1 ? "Fichiers ouverts" : "Fichier ouvert", null);
   });
 }
-if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit };
+if (location.protocol === "file:" || location.hostname === "localhost") window.__aurore = { L, Q, Player, UI, Viz, Disc, importEntries, AndroidMusic, NP, NV, Theme, ACTIONS, closeSheet, Guide, Updates, An, Fx, HUMEURS, Edit, LanPC, LanPhone };
 boot();

@@ -8,7 +8,7 @@ for p in res.rglob("splash.png"): p.unlink()
 shutil.copytree(here / "res", res, dirs_exist_ok=True)
 
 man = app / "src" / "main" / "AndroidManifest.xml"; s = man.read_text()
-perms = ["android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK", "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK", "android.permission.READ_MEDIA_AUDIO"]
+perms = ["android.permission.REQUEST_INSTALL_PACKAGES", "android.permission.FOREGROUND_SERVICE", "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK", "android.permission.POST_NOTIFICATIONS", "android.permission.WAKE_LOCK", "android.permission.READ_MEDIA_AUDIO", "android.permission.ACCESS_NETWORK_STATE", "android.permission.ACCESS_WIFI_STATE"]
 add = "".join(f'    <uses-permission android:name="{p}" />\n' for p in perms if p not in s)
 if "android.permission.READ_EXTERNAL_STORAGE" not in s:
     add += '    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n'
@@ -50,6 +50,8 @@ if "AuroreService" not in s:
     <queries>
         <package android:name="com.google.android.projection.gearhead" />
     </queries>""", 1)
+if "networkSecurityConfig" not in s:
+    s = s.replace("<application", '<application android:networkSecurityConfig="@xml/network_security_config"', 1)
 man.write_text(s)
 
 # module maison : musique du téléphone (MediaStore) + serveur de fichiers avec plages d'octets

@@ -20,6 +20,17 @@ contextBridge.exposeInMainWorld("auroreNative", {
     install: () => ipcRenderer.invoke("aurore:update-install"),
     on: (cb) => ipcRenderer.on("aurore:update", (_e, st) => cb(st)),
   },
+  lan: {
+    info: () => ipcRenderer.invoke("aurore:lan-info"),
+    code: () => ipcRenderer.invoke("aurore:lan-code"),
+    stop: () => ipcRenderer.invoke("aurore:lan-stop"),
+    forget: (id) => ipcRenderer.invoke("aurore:lan-forget", String(id)),
+    onEvent: (cb) => ipcRenderer.on("aurore:lan-event", (_e, ev) => cb(ev)),
+    onAsk: (cb) => ipcRenderer.on("aurore:lan-ask", async (_e, q) => {
+      let r; try { r = await cb(q.kind, q.payload); } catch (e) { r = { error: String((e && e.message) || e) }; }
+      ipcRenderer.send("aurore:lan-reply", q.rid, r === undefined ? null : r);
+    }),
+  },
   onOpenFiles: (cb) => {
     ipcRenderer.on("aurore:open-files", (_e, list) => cb(list));
     ipcRenderer.send("aurore:ready");
