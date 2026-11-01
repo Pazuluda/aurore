@@ -568,22 +568,46 @@ public class AuroreMusicPlugin extends Plugin {
             java.net.HttpURLConnection c = null;
             try {
                 Uri cu = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mid);
+                InputStream in;
+                try {
+                    in = mid >= 0 ? getContext().getContentResolver().openInputStream(cu) : null;
+                } catch (Exception e) {
+                    in = null;
+                }
+                if (in == null) {
+                    call.reject("Fichier illisible sur le téléphone", "FILE");
+                    return;
+                }
                 c = lanConn(url, "POST", token, 120000);
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/octet-stream");
                 c.setChunkedStreamingMode(65536);
-                try (InputStream in = getContext().getContentResolver().openInputStream(cu); java.io.OutputStream o = c.getOutputStream()) {
-                    if (in == null) throw new IOException("fichier");
+                boolean cut = false;
+                try (InputStream src = in; java.io.OutputStream o = c.getOutputStream()) {
                     byte[] buf = new byte[65536];
                     int n;
-                    while ((n = in.read(buf)) > 0) o.write(buf, 0, n);
+                    while ((n = src.read(buf)) > 0) o.write(buf, 0, n);
+                } catch (IOException e) {
+                    cut = true; // le PC a peut-être répondu avant la fin (format refusé, écriture impossible)
                 }
-                int code = c.getResponseCode();
+                int code;
+                String body = "";
+                try {
+                    code = c.getResponseCode();
+                    InputStream rs = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                    if (rs != null) body = readAll(rs, 4096);
+                } catch (IOException e) {
+                    call.reject(cut ? "Connexion coupée pendant l'envoi" : "Pas de réponse du PC", "NET");
+                    return;
+                }
                 JSObject r = new JSObject();
                 r.put("status", code);
+                r.put("body", body);
                 call.resolve(r);
+            } catch (java.net.SocketTimeoutException e) {
+                call.reject("Le PC ne répond plus", "NET");
             } catch (Exception e) {
-                call.reject("Envoi impossible", "UPLOAD");
+                call.reject("Envoi impossible", "NET");
             } finally {
                 if (c != null) c.disconnect();
             }

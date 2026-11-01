@@ -91,7 +91,8 @@ const LanPC = NATIVE_WIN && NATIVE_WIN.lan ? {
     NATIVE_WIN.lan.onAsk((kind, p) => this.answer(kind, p));
     NATIVE_WIN.lan.onEvent((ev) => {
       if (ev.type === "paired") { toast(`« ${ev.name} » est associé à ce PC.`); this.hasPhone = true; if (!$("#sheet").hidden) this.open(); }
-      if (ev.type === "received") toast(`Reçu de ${ev.from} : ${ev.name}`);
+      if (ev.type === "received") toast(`Reçu de ${ev.from} : ${ev.name}${ev.moved ? " (rangé dans Téléchargements › aurore : Windows bloque l'écriture dans Musique)" : ""}`, { ms: ev.moved ? 9000 : 4000 });
+      if (ev.type === "upload-error") toast(ev.reason === "ecriture" ? `« ${ev.name} » n'a pas pu être enregistré : Windows empêche aurore d'écrire. Ouvre Sécurité Windows › Protection contre les ransomwares › Accès contrôlé aux dossiers, et autorise aurore.` : `Réception de « ${ev.name} » interrompue (Wi-Fi coupé ?).`, { ms: 12000 });
     });
   },
   async answer(kind, p) {
@@ -186,13 +187,35 @@ const LanPhone = AndroidMusic ? {
   async send(ids) {
     if (!this.pc) return toast("Associe d'abord ton PC : Réglages → Mon PC.", { action: { label: "Associer", fn: () => this.open() } });
     if (!(await this.reach())) return toast(`${this.pc.name} est introuvable : ouvre aurore sur le PC, sur le même Wi-Fi.`);
-    let n = 0;
+    let n = 0, moved = 0; const fails = [];
+    const WHY = {
+      format: "le PC n'accepte pas ce format",
+      ecriture: "Windows empêche aurore d'écrire sur le PC (voir « Accès contrôlé aux dossiers » dans la Sécurité Windows)",
+      taille: "le fichier est trop gros",
+      reseau: "la connexion a coupé pendant l'envoi (Wi-Fi faible ?)",
+      FILE: "le fichier est illisible sur le téléphone",
+      NET: "la connexion a coupé pendant l'envoi (Wi-Fi faible ?)",
+      token: "le PC ne reconnaît plus ce téléphone : associe-le à nouveau",
+    };
     for (const id of ids) {
       const f = L.files.get(id), t = L.tracks.get(id); if (!f || !f.media) continue;
       toast(`Envoi au PC : ${t.title}`, { ms: 3000 });
-      try { const r = await this.call("lanUpload", { url: this.url("/upload?name=" + encodeURIComponent(f.name)), token: this.pc.token, mid: f.mid }); if (r.status === 200) n++; } catch { /* suivant */ }
+      let why = null;
+      for (let tries = 0; tries < 2; tries++) { // une 2e chance si le Wi-Fi a coupé
+        try {
+          const r = await this.call("lanUpload", { url: this.url("/upload?name=" + encodeURIComponent(f.name)), token: this.pc.token, mid: f.mid });
+          let b = {}; try { b = JSON.parse(r.body || "{}"); } catch { /* ancienne version du PC */ }
+          if (r.status === 200) { n++; if (b.folder === "downloads") moved++; why = null; break; }
+          why = b.error || (r.status === 401 ? "token" : "HTTP " + r.status);
+          if (why !== "reseau") break;
+        } catch (e) { why = (e && e.code) || "NET"; if (why !== "NET") break; }
+      }
+      if (why) fails.push([t.title, why]);
     }
-    toast(n ? `${plural(n, "titre envoyé", "titres envoyés")} : il${n > 1 ? "s sont" : " est"} dans Musique › aurore › Du téléphone, sur le PC.` : "L'envoi n'a pas marché. Vérifie que les deux sont sur le même Wi-Fi.");
+    const where = moved ? "dans Téléchargements › aurore sur le PC (Windows bloque le dossier Musique)" : "dans Musique › aurore › Du téléphone, sur le PC";
+    if (!fails.length) return toast(n ? `${plural(n, "titre envoyé", "titres envoyés")} : ${n > 1 ? "ils sont" : "il est"} ${where}.` : "Aucun titre à envoyer.", { ms: 7000 });
+    const [title, why] = fails[0];
+    toast(`${n ? `${plural(n, "titre envoyé", "titres envoyés")}, mais ` : ""}« ${title} »${fails.length > 1 ? ` et ${plural(fails.length - 1, "autre", "autres")}` : ""} n'${fails.length > 1 ? "ont" : "a"} pas pu partir : ${WHY[why] || why}.`, { ms: 10000 });
   },
   /* ---- association ---- */
   async open() {

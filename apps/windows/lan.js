@@ -10,9 +10,9 @@ const fsp = fs.promises;
 const path = require("path");
 
 const PORT = 47130, DISCO = 47131;
-const AUDIO_EXT = /\.(mp3|flac|m4a|aac|ogg|oga|opus|wav)$/i;
+const AUDIO_EXT = /\.(mp3|flac|m4a|m4b|mp4|aac|ogg|oga|opus|wav|wave|webm|weba|aif|aiff)$/i;
 
-function createLan({ getConfig, saveConfig, library, freeName, ask, notify }) {
+function createLan({ getConfig, saveConfig, library, freeName, ask, notify, fallbackDir, onFallback }) {
   let server = null, udp = null, code = null, codeAt = 0;
   const cfg = () => { const c = getConfig(); c.lan ||= { id: crypto.randomBytes(8).toString("hex"), phones: [] }; return c.lan; };
   const name = () => os.hostname() || "PC";
@@ -61,19 +61,38 @@ function createLan({ getConfig, saveConfig, library, freeName, ask, notify }) {
       }
       if (p === "/upload" && req.method === "POST") {
         const fname = path.basename(String(u.searchParams.get("name") || "titre.mp3")).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 150);
-        if (!AUDIO_EXT.test(fname)) return send(res, 415, { error: "format" });
-        const dir = path.join(library(), "Du téléphone");
-        await fsp.mkdir(dir, { recursive: true });
+        if (!AUDIO_EXT.test(fname)) { req.resume(); return send(res, 415, { error: "format" }); }
+        /* Musique › aurore › Du téléphone ; si Windows refuse d'y écrire (« Accès contrôlé aux dossiers »,
+           dossier Musique dans OneDrive non disponible…), on range dans Téléchargements › aurore */
+        const main = path.join(library(), "Du téléphone");
+        let dir = null;
+        for (const d of [main, fallbackDir && fallbackDir()].filter(Boolean)) {
+          try { await fsp.mkdir(d, { recursive: true }); const probe = path.join(d, ".aurore-" + crypto.randomBytes(4).toString("hex")); await fsp.writeFile(probe, ""); await fsp.unlink(probe); dir = d; break; } catch { /* dossier suivant */ }
+        }
+        if (!dir) { req.resume(); notify({ type: "upload-error", reason: "ecriture", name: fname, from: phone.name }); return send(res, 507, { error: "ecriture" }); }
         const dest = await freeName(dir, fname), tmp = dest + ".part";
-        const max = 800e6; let n = 0;
-        await new Promise((resolve, reject) => {
-          const out = fs.createWriteStream(tmp);
-          req.on("data", (c) => { n += c.length; if (n > max) { req.destroy(); reject(new Error("trop gros")); } });
-          req.pipe(out); out.on("finish", resolve); out.on("error", reject); req.on("error", reject);
-        });
-        await fsp.rename(tmp, dest);
-        notify({ type: "received", name: fname, from: phone.name });
-        return send(res, 200, { ok: true, name: path.basename(dest) });
+        const max = 2e9; let n = 0;
+        try {
+          await new Promise((resolve, reject) => {
+            const out = fs.createWriteStream(tmp);
+            req.on("data", (c) => { n += c.length; if (n > max) { req.destroy(); reject(Object.assign(new Error("trop gros"), { why: "taille" })); } });
+            req.on("close", () => { if (!req.complete) reject(Object.assign(new Error("coupé"), { why: "reseau" })); });
+            req.on("error", () => reject(Object.assign(new Error("coupé"), { why: "reseau" })));
+            out.on("error", () => reject(Object.assign(new Error("écriture"), { why: "ecriture" })));
+            out.on("finish", resolve);
+            req.pipe(out);
+          });
+          await fsp.rename(tmp, dest);
+        } catch (e) {
+          fsp.unlink(tmp).catch(() => {});
+          notify({ type: "upload-error", reason: e.why || "ecriture", name: fname, from: phone.name });
+          try { send(res, e.why === "taille" ? 413 : 500, { error: e.why || "ecriture" }); } catch { /* connexion déjà coupée */ }
+          return;
+        }
+        const moved = dir !== main;
+        if (moved && onFallback) onFallback(dir);
+        notify({ type: "received", name: fname, from: phone.name, moved });
+        return send(res, 200, { ok: true, name: path.basename(dest), folder: moved ? "downloads" : "music" });
       }
       return send(res, 404, { error: "inconnu" });
     } catch (e) { try { send(res, 500, { error: String((e && e.message) || e).slice(0, 120) }); } catch { /* déjà répondu */ } }

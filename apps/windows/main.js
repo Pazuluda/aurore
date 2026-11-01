@@ -270,6 +270,8 @@ else {
       getConfig: () => config, saveConfig, library: () => library, freeName,
       ask: askRenderer,
       notify: (ev) => { if (win && rendererReady) win.webContents.send("aurore:lan-event", ev); },
+      fallbackDir: () => path.join(app.getPath("downloads"), "aurore"),
+      onFallback: (dir) => { if (!config.folders.some((d) => inside(dir, d))) { config.folders.push(dir); saveConfig(); watchFolders(); } },
     });
     setupUpdater();
     pendingFiles = filesFromArgs(process.argv);
