@@ -559,6 +559,80 @@ public class AuroreMusicPlugin extends Plugin {
         }, "aurore-lan").start();
     }
 
+    /** envoie un titre au PC en petits morceaux de 512 Ko : chaque morceau est une petite requête
+     *  à taille fixe (comme la télécommande), réessayée si elle échoue. Marche même quand un antivirus
+     *  ou un répéteur Wi-Fi coupe les longs envois d'un seul bloc. */
+    @PluginMethod
+    public void lanUploadParts(final PluginCall call) {
+        final String base = call.getString("url", ""), token = call.getString("token", "");
+        final long mid = (long) (double) call.getDouble("mid", -1.0);
+        new Thread(() -> {
+            Uri cu = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, mid);
+            ContentResolver cr = getContext().getContentResolver();
+            long total;
+            InputStream in;
+            try {
+                if (mid < 0) throw new IOException("id");
+                try (android.os.ParcelFileDescriptor fd = cr.openFileDescriptor(cu, "r")) {
+                    total = fd != null ? fd.getStatSize() : -1;
+                }
+                in = cr.openInputStream(cu);
+                if (in == null || total <= 0) throw new IOException("vide");
+            } catch (Exception e) {
+                call.reject("Fichier illisible sur le téléphone", "FILE");
+                return;
+            }
+            String uid = Long.toHexString(System.nanoTime()) + Long.toHexString(mid);
+            String last = "";
+            try (InputStream src = in) {
+                byte[] buf = new byte[512 * 1024];
+                long off = 0;
+                while (off < total) {
+                    int len = 0, n;
+                    while (len < buf.length && (n = src.read(buf, len, buf.length - len)) > 0) len += n;
+                    if (len == 0) throw new IOException("fin du fichier");
+                    boolean sent = false;
+                    for (int tries = 0; tries < 5 && !sent; tries++) {
+                        if (tries > 0) try { Thread.sleep(600L * tries); } catch (InterruptedException ignored) { /* rien */ }
+                        java.net.HttpURLConnection c = null;
+                        try {
+                            c = lanConn(base + "&id=" + uid + "&offset=" + off + "&total=" + total, "POST", token, 30000);
+                            c.setDoOutput(true);
+                            c.setRequestProperty("Content-Type", "application/octet-stream");
+                            c.setFixedLengthStreamingMode(len);
+                            try (java.io.OutputStream o = c.getOutputStream()) { o.write(buf, 0, len); }
+                            int code = c.getResponseCode();
+                            InputStream rs = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                            String body = rs != null ? readAll(rs, 4096) : "";
+                            if (code == 200) { sent = true; last = body; break; }
+                            // réponse claire du PC (ancienne version, format, écriture) : inutile de réessayer
+                            JSObject r = new JSObject();
+                            r.put("status", code);
+                            r.put("body", body);
+                            call.resolve(r);
+                            return;
+                        } catch (Exception e) {
+                            last = e.getClass().getSimpleName();
+                        } finally {
+                            if (c != null) c.disconnect();
+                        }
+                    }
+                    if (!sent) {
+                        call.reject("Connexion coupée (" + last + ")", "NET");
+                        return;
+                    }
+                    off += len;
+                }
+                JSObject r = new JSObject();
+                r.put("status", 200);
+                r.put("body", last);
+                call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Fichier illisible sur le téléphone", "FILE");
+            }
+        }, "aurore-lan").start();
+    }
+
     /** envoie un titre du téléphone vers le PC */
     @PluginMethod
     public void lanUpload(final PluginCall call) {

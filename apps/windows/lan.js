@@ -14,6 +14,7 @@ const AUDIO_EXT = /\.(mp3|flac|m4a|m4b|mp4|aac|ogg|oga|opus|wav|wave|webm|weba|a
 
 function createLan({ getConfig, saveConfig, library, freeName, ask, notify, fallbackDir, onFallback }) {
   let server = null, udp = null, code = null, codeAt = 0;
+  const parts = new Map(); // envois en morceaux en cours
   const cfg = () => { const c = getConfig(); c.lan ||= { id: crypto.randomBytes(8).toString("hex"), phones: [] }; return c.lan; };
   const name = () => os.hostname() || "PC";
   const ips = () => Object.values(os.networkInterfaces()).flat().filter((i) => i && i.family === "IPv4" && !i.internal).map((i) => i.address);
@@ -30,6 +31,14 @@ function createLan({ getConfig, saveConfig, library, freeName, ask, notify, fall
     req.on("data", (c) => { n += c.length; if (n > max) { reject(new Error("trop gros")); req.destroy(); } else chunks.push(c); });
     req.on("end", () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}")); } catch (e) { reject(e); } });
     req.on("error", reject);
+  });
+
+  const rawBody = (req, max) => new Promise((resolve, reject) => {
+    const chunks = []; let n = 0;
+    req.on("data", (c) => { n += c.length; if (n > max) { reject(new Error("trop gros")); req.destroy(); } else chunks.push(c); });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", reject);
+    req.on("close", () => { if (!req.complete) reject(new Error("coupé")); });
   });
 
   async function handle(req, res) {
@@ -58,6 +67,40 @@ function createLan({ getConfig, saveConfig, library, freeName, ask, notify, fall
         const st = await fsp.stat(r.path);
         res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": st.size });
         return fs.createReadStream(r.path).pipe(res);
+      }
+      if (p === "/upload-part" && req.method === "POST") {
+        const fname = path.basename(String(u.searchParams.get("name") || "titre.mp3")).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 150);
+        const uid = String(u.searchParams.get("id") || "").replace(/[^\w]/g, "").slice(0, 40);
+        const off = Number(u.searchParams.get("offset")), total = Number(u.searchParams.get("total"));
+        if (!uid || !(off >= 0) || !(total > 0) || total > 2e9) { req.resume(); return send(res, 400, { error: "parametres" }); }
+        if (!AUDIO_EXT.test(fname)) { req.resume(); return send(res, 415, { error: "format" }); }
+        const data = await rawBody(req, 4 * 1024 * 1024);
+        for (const [k, v] of parts) if (Date.now() - v.at > 15 * 60 * 1000) { parts.delete(k); fsp.unlink(v.tmp).catch(() => {}); }
+        let up = parts.get(uid);
+        if (!up) {
+          if (off !== 0) return send(res, 409, { error: "reseau" });
+          const main = path.join(library(), "Du téléphone");
+          let dir = null;
+          for (const d of [main, fallbackDir && fallbackDir()].filter(Boolean)) {
+            try { await fsp.mkdir(d, { recursive: true }); const probe = path.join(d, ".aurore-" + crypto.randomBytes(4).toString("hex")); await fsp.writeFile(probe, ""); await fsp.unlink(probe); dir = d; break; } catch { /* dossier suivant */ }
+          }
+          if (!dir) { notify({ type: "upload-error", reason: "ecriture", name: fname, from: phone.name }); return send(res, 507, { error: "ecriture" }); }
+          const dest = await freeName(dir, fname);
+          up = { dir, dest, tmp: dest + ".part", size: 0, moved: dir !== main, at: Date.now() };
+          try { await fsp.writeFile(up.tmp, ""); } catch { return send(res, 507, { error: "ecriture" }); }
+          parts.set(uid, up);
+        }
+        up.at = Date.now();
+        if (off + data.length <= up.size) return send(res, 200, { ok: true, size: up.size }); // morceau déjà reçu (réponse perdue)
+        if (off !== up.size) return send(res, 409, { error: "reseau", size: up.size });
+        try { await fsp.appendFile(up.tmp, data); } catch { parts.delete(uid); fsp.unlink(up.tmp).catch(() => {}); notify({ type: "upload-error", reason: "ecriture", name: fname, from: phone.name }); return send(res, 507, { error: "ecriture" }); }
+        up.size += data.length;
+        if (up.size < total) return send(res, 200, { ok: true, size: up.size });
+        parts.delete(uid);
+        try { await fsp.rename(up.tmp, up.dest); } catch { fsp.unlink(up.tmp).catch(() => {}); return send(res, 507, { error: "ecriture" }); }
+        if (up.moved && onFallback) onFallback(up.dir);
+        notify({ type: "received", name: fname, from: phone.name, moved: up.moved });
+        return send(res, 200, { ok: true, done: true, name: path.basename(up.dest), folder: up.moved ? "downloads" : "music" });
       }
       if (p === "/upload" && req.method === "POST") {
         const fname = path.basename(String(u.searchParams.get("name") || "titre.mp3")).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").slice(0, 150);
