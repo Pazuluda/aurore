@@ -1,6 +1,6 @@
 /* aurore : fonctionne hors ligne. La page est d'abord demandée au réseau (pour recevoir les mises à jour),
    puis au cache si le réseau ne répond pas. Les polices sont gardées après la première visite. */
-const VERSION = "cb5f755433";
+const VERSION = "59d016a198";
 const SHELL = ["./", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png", "./icons/favicon.png"];
 
 self.addEventListener("install", (e) => {
